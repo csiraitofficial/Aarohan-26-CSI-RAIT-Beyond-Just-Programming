@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Aarohan Healthcare",
+    "slug": "aarohan-healthcare",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}
