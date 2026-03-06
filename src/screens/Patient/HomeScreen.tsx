@@ -2,121 +2,250 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/types';
-import { Card } from '../../components/ui/Card';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { RiskBadge } from '../../components/ui/RiskBadge';
-import { EmergencyBanner } from '../../components/ui/EmergencyBanner';
 import { EmergencyModal } from '../../components/ui/EmergencyModal';
 import { usePatient } from '../../context/PatientContext';
 import { theme } from '../../utils/theme';
+import { Reminder } from '../../models';
 
 type Props = NativeStackScreenProps<PatientStackParamList, 'HomeScreen'>;
+
+/* ── helpers ── */
+const riskColors: Record<string, { bg: string; text: string; border: string }> = {
+  mild:      { bg: '#F0FDF4', text: '#15803D', border: '#86EFAC' },
+  moderate:  { bg: '#FFFBEB', text: '#B45309', border: '#FCD34D' },
+  emergency: { bg: '#FEF2F2', text: '#DC2626', border: '#FCA5A5' },
+};
+
+const reminderIcons: Record<string, string> = {
+  medication: '💊',
+  'follow-up': '🩺',
+  'ai-check': '🤖',
+};
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { profile, caseHistory, reminders } = usePatient();
   const [emergencyVisible, setEmergencyVisible] = useState(false);
+  const [notifVisible, setNotifVisible] = useState(false);
 
-  const lastRisk = caseHistory.length > 0 ? caseHistory[0].result.risk : 'mild';
+  const lastCase = caseHistory.length > 0 ? caseHistory[0] : null;
+  const lastRisk = lastCase?.result.risk ?? 'mild';
+  const lastCheckDate = lastCase?.date ?? '—';
   const activeEmergency = caseHistory.find((c) => c.status === 'emergency_active');
-  const pendingDoctor = caseHistory.find((c) => c.status === 'doctor_assigned');
-  const activeCase = caseHistory.find((c) => c.status === 'active');
-  const upcomingReminder = reminders.find((r) => r.enabled);
+  const upcomingReminders: Reminder[] = reminders.filter((r) => r.enabled).slice(0, 3);
 
-  /* dynamic alerts */
-  const alerts: Array<{ icon: string; text: string; color: string }> = [];
-  if (activeEmergency) alerts.push({ icon: '🚨', text: 'Emergency case unresolved', color: '#FEE2E2' });
-  if (pendingDoctor) alerts.push({ icon: '🩺', text: 'Pending doctor consultation', color: '#FEF3C7' });
-  if (upcomingReminder) alerts.push({ icon: '🔔', text: `Upcoming: ${upcomingReminder.title}`, color: '#EBF3FF' });
+  const healthTips = [
+    'Drink plenty of water and rest if you have a fever.',
+    'Take prescribed medications on time for faster recovery.',
+    'Monitor your oxygen levels if you feel short of breath.',
+  ];
+  const tip = healthTips[new Date().getDate() % healthTips.length];
+
+  const riskStyle = riskColors[lastRisk] ?? riskColors.mild;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* ── Active Emergency Banner ── */}
-      {activeEmergency && (
-        <Pressable onPress={() => navigation.navigate('EmergencyDashboard', { classificationId: activeEmergency.id })}>
-          <EmergencyBanner message="🚨 Emergency Active — Tap to view" />
-        </Pressable>
-      )}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
 
-      {/* ── Header ── */}
+      {/* ═══════════════════════════════════════
+          TOP HEADER
+      ═══════════════════════════════════════ */}
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>Hello, {profile.name.split(' ')[0]}</Text>
-          <View style={styles.statusRow}>
-            <Text style={styles.sub}>Health Status</Text>
-            <RiskBadge risk={lastRisk} />
-          </View>
+        <View style={styles.headerLeft}>
+          <Text style={styles.appName}>Swasthya Saathi</Text>
+          <Text style={styles.greeting}>Hello, {profile.name.split(' ')[0]} 👋</Text>
         </View>
-        <View style={styles.avatarWrap}>
-          <Text style={styles.avatar}>👩🏽</Text>
+        <View style={styles.headerRight}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => setNotifVisible(!notifVisible)}
+            accessibilityLabel="Notifications"
+          >
+            <Text style={styles.iconBtnText}>🔔</Text>
+            {activeEmergency && <View style={styles.notifDot} />}
+          </Pressable>
+          <Pressable
+            style={styles.avatarWrap}
+            onPress={() => navigation.navigate('ProfileScreen')}
+            accessibilityLabel="Profile"
+          >
+            <Text style={styles.avatarEmoji}>👩🏽</Text>
+          </Pressable>
         </View>
       </View>
 
-      {/* ── Dynamic Alert Banners ── */}
-      {alerts.map((a, i) => (
-        <View key={i} style={[styles.alertBanner, { backgroundColor: a.color }]}>
-          <Text style={styles.alertIcon}>{a.icon}</Text>
-          <Text style={styles.alertText}>{a.text}</Text>
+      {/* notification mini-panel */}
+      {notifVisible && (
+        <View style={styles.notifPanel}>
+          {activeEmergency ? (
+            <Pressable
+              onPress={() => {
+                setNotifVisible(false);
+                navigation.navigate('EmergencyDashboard', { classificationId: activeEmergency.id });
+              }}
+            >
+              <Text style={styles.notifItem}>🚨 Emergency case active — Tap to view</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.notifItem}>✅ No urgent notifications</Text>
+          )}
         </View>
-      ))}
-
-      {/* ── Current Case Status ── */}
-      {(activeCase || pendingDoctor) && (
-        <Card style={styles.caseStatusCard}>
-          <Text style={styles.caseStatusTitle}>📋 Active Case</Text>
-          <View style={styles.caseStatusRow}>
-            <RiskBadge risk={(activeCase || pendingDoctor)!.result.risk} />
-            <Text style={styles.caseStatusDate}>{(activeCase || pendingDoctor)!.date}</Text>
-          </View>
-          <Text style={styles.caseStatusSymptoms}>{(activeCase || pendingDoctor)!.symptoms.join(', ')}</Text>
-          <Text style={styles.caseStatusLabel}>
-            Status: {(activeCase || pendingDoctor)!.status.replace('_', ' ').toUpperCase()}
-          </Text>
-        </Card>
       )}
 
-      {/* ── Action Cards ── */}
-      <Pressable style={styles.actionCard} onPress={() => navigation.navigate('SymptomAgentScreen')}>
-        <Text style={styles.actionIcon}>🤖</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.actionTitle}>AI Health Check</Text>
-          <Text style={styles.actionSub}>Voice or manual symptom entry</Text>
+      {/* ═══════════════════════════════════════
+          HEALTH STATUS CARD
+      ═══════════════════════════════════════ */}
+      <View style={[styles.healthCard, { backgroundColor: riskStyle.bg, borderColor: riskStyle.border }]}>
+        <View style={styles.healthCardTop}>
+          <View>
+            <Text style={styles.healthCardTitle}>Your Health Status</Text>
+            <Text style={styles.healthCardSub}>Last check: {lastCheckDate}</Text>
+          </View>
+          <View style={[styles.statusDot, { backgroundColor: riskStyle.border }]} />
         </View>
-        <Text style={styles.arrow}>→</Text>
-      </Pressable>
-
-      <Pressable style={styles.actionCard} onPress={() => navigation.navigate('RecordsScreen')}>
-        <Text style={styles.actionIcon}>📁</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.actionTitle}>My Health Records</Text>
-          <Text style={styles.actionSub}>{caseHistory.length} past records</Text>
+        <View style={styles.healthCardBottom}>
+          <RiskBadge risk={lastRisk} />
+          <Text style={[styles.healthCardRiskLabel, { color: riskStyle.text }]}>
+            {lastRisk.charAt(0).toUpperCase() + lastRisk.slice(1)} condition
+          </Text>
         </View>
-        <Text style={styles.arrow}>→</Text>
-      </Pressable>
+      </View>
 
-      <Pressable style={[styles.actionCard, styles.emergencyCard]} onPress={() => setEmergencyVisible(true)}>
-        <Text style={styles.actionIcon}>🚨</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.actionTitle, { color: '#991B1B' }]}>Emergency Help</Text>
-          <Text style={[styles.actionSub, { color: '#B91C1C' }]}>Immediate assistance</Text>
+      {/* ═══════════════════════════════════════
+          PRIMARY ACTION — START HEALTH CHECK
+      ═══════════════════════════════════════ */}
+      <View style={styles.primaryCard}>
+        <View style={styles.primaryCardInner}>
+          <Text style={styles.primaryCardEmoji}>🤖</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.primaryCardTitle}>Start Health Check</Text>
+            <Text style={styles.primaryCardDesc}>Analyze your symptoms and vitals.</Text>
+          </View>
         </View>
-        <Text style={styles.arrow}>→</Text>
-      </Pressable>
+        <PrimaryButton
+          title="Start AI Health Check"
+          onPress={() => navigation.navigate('SymptomAgentScreen')}
+        />
+      </View>
 
-      {/* ── Recent Activity ── */}
-      <Text style={styles.sectionTitle}>Recent Activity</Text>
-      {caseHistory.slice(0, 3).map((c) => (
-        <Pressable key={c.id} onPress={() => navigation.navigate('CaseDetailScreen', { caseId: c.id })}>
-          <Card style={styles.activityCard}>
-            <View style={styles.activityRow}>
-              <RiskBadge risk={c.result.risk} />
-              <Text style={styles.activityDate}>{c.date}</Text>
-            </View>
-            <Text style={styles.activitySymptoms}>{c.symptoms.join(', ')}</Text>
-            <Text style={styles.activityStatus}>{c.status.replace('_', ' ').toUpperCase()}</Text>
-          </Card>
+      {/* ═══════════════════════════════════════
+          QUICK ACTIONS — 2 × 2 GRID
+      ═══════════════════════════════════════ */}
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.gridRow}>
+        {/* AI Health Check */}
+        <Pressable
+          style={[styles.gridCard, styles.gridCardBlue]}
+          onPress={() => navigation.navigate('SymptomAgentScreen')}
+          accessibilityLabel="AI Health Check"
+        >
+          <Text style={styles.gridIcon}>🤖</Text>
+          <Text style={styles.gridLabel}>AI Health{'\n'}Check</Text>
         </Pressable>
-      ))}
 
+        {/* Health Records */}
+        <Pressable
+          style={[styles.gridCard, styles.gridCardGreen]}
+          onPress={() => navigation.navigate('RecordsScreen')}
+          accessibilityLabel="My Health Records"
+        >
+          <Text style={styles.gridIcon}>📁</Text>
+          <Text style={styles.gridLabel}>My Health{'\n'}Records</Text>
+        </Pressable>
+      </View>
+      <View style={styles.gridRow}>
+        {/* Reminders */}
+        <Pressable
+          style={[styles.gridCard, styles.gridCardYellow]}
+          onPress={() => navigation.navigate('RemindersScreen')}
+          accessibilityLabel="Reminders"
+        >
+          <Text style={styles.gridIcon}>🔔</Text>
+          <Text style={styles.gridLabel}>Reminders</Text>
+        </Pressable>
+
+        {/* Emergency Help */}
+        <Pressable
+          style={[styles.gridCard, styles.gridCardRed]}
+          onPress={() => setEmergencyVisible(true)}
+          accessibilityLabel="Emergency Help"
+        >
+          <Text style={styles.gridIcon}>🚨</Text>
+          <Text style={styles.gridLabel}>Emergency{'\n'}Help</Text>
+        </Pressable>
+      </View>
+
+      {/* ═══════════════════════════════════════
+          UPCOMING REMINDERS
+      ═══════════════════════════════════════ */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Upcoming Reminders</Text>
+        <Pressable onPress={() => navigation.navigate('RemindersScreen')}>
+          <Text style={styles.seeAll}>See all</Text>
+        </Pressable>
+      </View>
+
+      {upcomingReminders.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>No upcoming reminders. Add one in Reminders.</Text>
+        </View>
+      ) : (
+        upcomingReminders.map((r) => (
+          <Pressable
+            key={r.id}
+            style={styles.reminderCard}
+            onPress={() => navigation.navigate('RemindersScreen')}
+          >
+            <View style={styles.reminderIconWrap}>
+              <Text style={styles.reminderIcon}>{reminderIcons[r.type] ?? '📅'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reminderTitle}>{r.title}</Text>
+              <Text style={styles.reminderTime}>{r.time}</Text>
+            </View>
+            <Text style={styles.reminderArrow}>›</Text>
+          </Pressable>
+        ))
+      )}
+
+      {/* ═══════════════════════════════════════
+          HEALTH TIP
+      ═══════════════════════════════════════ */}
+      <View style={styles.tipCard}>
+        <View style={styles.tipHeader}>
+          <Text style={styles.tipIcon}>💡</Text>
+          <Text style={styles.tipTitle}>Health Tip</Text>
+        </View>
+        <Text style={styles.tipText}>{tip}</Text>
+      </View>
+
+      {/* ═══════════════════════════════════════
+          EMERGENCY ACCESS
+      ═══════════════════════════════════════ */}
+      <View style={styles.emergencyCard}>
+        <View style={styles.emergencyCardTop}>
+          <Text style={styles.emergencyCardEmoji}>🚨</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.emergencyCardTitle}>Emergency Help</Text>
+            <Text style={styles.emergencyCardDesc}>Request immediate medical assistance.</Text>
+          </View>
+        </View>
+        <Pressable
+          style={styles.emergencyBtn}
+          onPress={() => setEmergencyVisible(true)}
+          accessibilityLabel="Request Emergency Help"
+        >
+          <Text style={styles.emergencyBtnText}>Request Emergency Help</Text>
+        </Pressable>
+      </View>
+
+      {/* ═══════════════════════════════════════
+          EMERGENCY CONFIRM MODAL
+      ═══════════════════════════════════════ */}
       <EmergencyModal
         visible={emergencyVisible}
         onConfirm={() => {
@@ -129,38 +258,167 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
+/* ─────────────────────────────────────────────
+   STYLES
+───────────────────────────────────────────── */
+const CARD_SHADOW = {
+  shadowColor: '#000',
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 2,
+};
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: theme.spacing.lg, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  greeting: { fontSize: 26, fontWeight: '800', color: theme.colors.textPrimary },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  sub: { color: theme.colors.textSecondary },
-  avatarWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#EBF3FF', alignItems: 'center', justifyContent: 'center' },
-  avatar: { fontSize: 28 },
-  alertBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 12, marginBottom: 8 },
-  alertIcon: { fontSize: 18 },
-  alertText: { flex: 1, fontWeight: '600', color: theme.colors.textPrimary, fontSize: 14 },
-  caseStatusCard: { backgroundColor: '#F0FDF4', borderLeftWidth: 4, borderLeftColor: theme.colors.primary },
-  caseStatusTitle: { fontSize: 15, fontWeight: '800', color: theme.colors.textPrimary, marginBottom: 8 },
-  caseStatusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  caseStatusDate: { color: theme.colors.textSecondary, fontSize: 13 },
-  caseStatusSymptoms: { color: theme.colors.textPrimary, fontWeight: '600', marginBottom: 4 },
-  caseStatusLabel: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
-  actionCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
-    borderRadius: theme.radius.lg, padding: theme.spacing.md, marginBottom: 12, gap: 12,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1,
+  content: { paddingHorizontal: theme.spacing.lg, paddingTop: 52, paddingBottom: 48 },
+
+  /* ── Header ── */
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
-  emergencyCard: { backgroundColor: '#FEE2E2' },
-  actionIcon: { fontSize: 28 },
-  actionTitle: { fontSize: 16, fontWeight: '700', color: theme.colors.textPrimary },
-  actionSub: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 2 },
-  arrow: { fontSize: 18, color: theme.colors.textSecondary },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.textPrimary, marginTop: 12, marginBottom: 12 },
-  activityCard: { marginBottom: 8 },
-  activityRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  activityDate: { color: theme.colors.textSecondary, fontSize: 13 },
-  activitySymptoms: { color: theme.colors.textPrimary, fontWeight: '600' },
-  activityStatus: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginTop: 4 },
+  headerLeft: { flex: 1 },
+  appName: { fontSize: 13, fontWeight: '700', color: theme.colors.primary, letterSpacing: 0.6, textTransform: 'uppercase' },
+  greeting: { fontSize: 24, fontWeight: '800', color: theme.colors.textPrimary, marginTop: 2 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EBF3FF', alignItems: 'center', justifyContent: 'center' },
+  iconBtnText: { fontSize: 18 },
+  notifDot: { position: 'absolute', top: 6, right: 6, width: 9, height: 9, borderRadius: 5, backgroundColor: theme.colors.danger, borderWidth: 1.5, borderColor: '#FFF' },
+  avatarWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EBF3FF', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: theme.colors.primary },
+  avatarEmoji: { fontSize: 24 },
+
+  /* ── Notification panel ── */
+  notifPanel: {
+    backgroundColor: '#FFF',
+    borderRadius: theme.radius.md,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...CARD_SHADOW,
+  },
+  notifItem: { fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' },
+
+  /* ── Health Status Card ── */
+  healthCard: {
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    padding: theme.spacing.md,
+    marginBottom: 16,
+    ...CARD_SHADOW,
+  },
+  healthCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  healthCardTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.textPrimary },
+  healthCardSub: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 3 },
+  statusDot: { width: 14, height: 14, borderRadius: 7, marginTop: 4 },
+  healthCardBottom: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  healthCardRiskLabel: { fontSize: 14, fontWeight: '700' },
+
+  /* ── Primary Action Card ── */
+  primaryCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...CARD_SHADOW,
+  },
+  primaryCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  primaryCardEmoji: { fontSize: 36 },
+  primaryCardTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.textPrimary },
+  primaryCardDesc: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 3 },
+
+  /* ── Section Header ── */
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.textPrimary, marginBottom: 12 },
+  seeAll: { fontSize: 13, fontWeight: '700', color: theme.colors.primary, marginBottom: 12 },
+
+  /* ── Quick Actions Grid ── */
+  gridRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  gridCard: {
+    flex: 1,
+    borderRadius: theme.radius.lg,
+    paddingVertical: 20,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...CARD_SHADOW,
+  },
+  gridCardBlue:   { backgroundColor: '#EBF3FF' },
+  gridCardGreen:  { backgroundColor: '#F0FDF4' },
+  gridCardYellow: { backgroundColor: '#FFFBEB' },
+  gridCardRed:    { backgroundColor: '#FEF2F2' },
+  gridIcon: { fontSize: 30 },
+  gridLabel: { fontSize: 13, fontWeight: '700', color: theme.colors.textPrimary, textAlign: 'center', lineHeight: 18 },
+
+  /* ── Reminders ── */
+  reminderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 12,
+    ...CARD_SHADOW,
+  },
+  reminderIconWrap: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#EBF3FF', alignItems: 'center', justifyContent: 'center' },
+  reminderIcon: { fontSize: 20 },
+  reminderTitle: { fontSize: 15, fontWeight: '700', color: theme.colors.textPrimary },
+  reminderTime: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 },
+  reminderArrow: { fontSize: 22, color: theme.colors.textSecondary },
+  emptyCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+  },
+  emptyText: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center' },
+
+  /* ── Health Tip ── */
+  tipCard: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    ...CARD_SHADOW,
+  },
+  tipHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  tipIcon: { fontSize: 20 },
+  tipTitle: { fontSize: 15, fontWeight: '800', color: '#0369A1' },
+  tipText: { fontSize: 14, color: '#0C4A6E', lineHeight: 21 },
+
+  /* ── Emergency Card ── */
+  emergencyCard: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    ...CARD_SHADOW,
+  },
+  emergencyCardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  emergencyCardEmoji: { fontSize: 32 },
+  emergencyCardTitle: { fontSize: 17, fontWeight: '800', color: '#991B1B' },
+  emergencyCardDesc: { fontSize: 13, color: '#B91C1C', marginTop: 3 },
+  emergencyBtn: {
+    backgroundColor: theme.colors.danger,
+    borderRadius: theme.radius.md,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  emergencyBtnText: { color: '#FFF', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 });
