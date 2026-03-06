@@ -6,7 +6,7 @@ import { RootStackParamList } from './types';
 import { OnboardingScreen } from '../screens/Auth/OnboardingScreen';
 import { LoginRegisterScreen } from '../screens/Auth/LoginRegisterScreen';
 import { PatientTabNavigator } from './PatientTabNavigator';
-import { DoctorDashboardScreen } from '../screens/Doctor/DoctorDashboardScreen';
+import { DoctorTabNavigator } from './DoctorTabNavigator';
 import { CHWDashboardScreen } from '../screens/CHW/CHWDashboardScreen';
 import { AdminDashboardScreen } from '../screens/Admin/AdminDashboardScreen';
 
@@ -33,7 +33,7 @@ export const AppNavigator: React.FC = () => {
       ) : role === 'patient' ? (
         <Stack.Screen name="PatientTabs" component={PatientTabNavigator} options={{ headerShown: false }} />
       ) : role === 'doctor' ? (
-        <Stack.Screen name="DoctorDashboard" component={DoctorDashboardScreen} options={{ title: 'Doctor' }} />
+        <Stack.Screen name="DoctorDashboard" component={DoctorTabNavigator} options={{ headerShown: false }} />
       ) : role === 'chw' ? (
         <Stack.Screen name="CHWDashboard" component={CHWDashboardScreen} options={{ title: 'CHW' }} />
       ) : (

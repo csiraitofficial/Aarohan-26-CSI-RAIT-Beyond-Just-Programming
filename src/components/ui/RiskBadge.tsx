@@ -12,7 +12,8 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ risk, large = false }) => 
   const map = {
     mild: { bg: '#DCFCE7', text: theme.colors.mild, label: 'Mild' },
     moderate: { bg: '#FEF9C3', text: theme.colors.moderate, label: 'Moderate' },
-    emergency: { bg: '#FEE2E2', text: theme.colors.emergency, label: 'Emergency' }
+    emergency: { bg: '#FEE2E2', text: theme.colors.emergency, label: 'Emergency' },
+    pending: { bg: '#F3F4F6', text: '#6B7280', label: 'Pending' },
   };
   const config = map[risk];
 

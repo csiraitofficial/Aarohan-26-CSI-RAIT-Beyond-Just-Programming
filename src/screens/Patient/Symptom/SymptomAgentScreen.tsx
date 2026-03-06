@@ -158,7 +158,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
         guidance: result.primary_concern || 'Analysis complete',
         homeRemedies: result.home_remedies || [],
         warningSignsToWatch: result.warning_signs || [],
-        escalationReason: result.triage_level === 'emergency' ? result.primary_concern : undefined,
+        escalationReason: result.triage_level === 'emergency' ? (result.primary_concern ?? undefined) : undefined,
       };
       setClassification(classification);
 

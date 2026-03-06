@@ -38,3 +38,21 @@ export type PatientTabParamList = {
   RemindersTab: undefined;
   ProfileTab: undefined;
 };
+
+/* Doctor tab param list */
+export type DoctorTabParamList = {
+  QueueTab: undefined;
+  HealthTab: undefined;
+  ConsultTab: undefined;
+  PrescriptionTab: undefined;
+  NotificationsTab: undefined;
+};
+
+/* Doctor stack param list */
+export type DoctorStackParamList = {
+  PatientQueueScreen: undefined;
+  PatientHealthDetailsScreen: { patientId?: string };
+  LiveConsultationScreen: { patientId?: string };
+  EPrescriptionScreen: { patientId?: string };
+  DoctorNotificationsScreen: undefined;
+};

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { Card } from '../../components/ui/Card';
@@ -9,59 +9,67 @@ import { UserRole } from '../../models';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { theme } from '../../utils/theme';
-import { login as apiLogin, register as apiRegister } from '../../services/api';
+
+// ── TODO: remove this flag and restore real API auth once backend is ready ──
+const DEMO_MODE = true;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
+
+const ROLES: { value: UserRole; label: string; icon: string; color: string; bg: string }[] = [
+  { value: 'patient',  label: 'Patient',  icon: '🧑',  color: '#0A84FF', bg: '#EFF6FF' },
+  { value: 'doctor',   label: 'Doctor',   icon: '👨‍⚕️', color: '#059669', bg: '#ECFDF5' },
+  { value: 'chw',      label: 'CHW',      icon: '🏥',  color: '#7C3AED', bg: '#F5F3FF' },
+  { value: 'admin',    label: 'Admin',    icon: '🛡️',  color: '#DC2626', bg: '#FEF2F2' },
+];
 
 export const LoginRegisterScreen: React.FC<Props> = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
 
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [loading, setLoading] = useState(false);
-  const [touched, setTouched] = useState({ phone: false, password: false, fullName: false });
-
-  const errors = useMemo(() => {
-    return {
-      phone: phone.length >= 10 ? '' : 'Please enter a valid phone number.',
-      password: password.length >= 6 ? '' : 'Password must be at least 6 characters.',
-      fullName: fullName.length >= 2 ? '' : 'Please enter your full name.',
-    };
-  }, [phone, password, fullName]);
-
-  const canSubmit = phone.length >= 10 && password.length >= 6 && (mode === 'login' || fullName.length >= 2);
+  const [mode, setMode]         = useState<'login' | 'register'>('login');
+  const [role, setRole]         = useState<UserRole>('patient');
+  const [loading, setLoading]   = useState(false);
 
   const handleSubmit = async () => {
-    setTouched({ phone: true, password: true, fullName: true });
-    if (!canSubmit || loading) return;
-
+    if (loading) return;
     setLoading(true);
     try {
-      if (mode === 'register') {
-        const response = await apiRegister({ full_name: fullName, phone, password });
-        const role = (response.user.role as UserRole) || 'patient';
-        await login(role, response.access_token, response.user.id);
+      if (DEMO_MODE) {
+        // ── Demo mode: skip API, log in with any input ──
+        await login(role, 'demo-token', 'demo-user-001');
       } else {
-        const response = await apiLogin({ phone, password });
-        const role = (response.user.role as UserRole) || 'patient';
-        await login(role, response.access_token, response.user.id);
+        // ── Real auth (restore when backend is ready) ──
+        const { login: apiLogin, register: apiRegister } = await import('../../services/api');
+        if (mode === 'register') {
+          const res = await apiRegister({ full_name: fullName, phone, password });
+          await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
+        } else {
+          const res = await apiLogin({ phone, password });
+          await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
+        }
       }
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Authentication failed. Please try again.');
+      // Alert only relevant outside demo mode — left here for when real auth is restored
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Card style={styles.card}>
         <Text style={styles.title}>Swasthya Saathi</Text>
         <Text style={styles.subtitle}>Your Health Companion</Text>
 
+        {/* Demo badge */}
+        <View style={styles.demoBadge}>
+          <Text style={styles.demoBadgeText}>🚧 Demo Mode — any input works</Text>
+        </View>
+
+        {/* Login / Register tabs */}
         <View style={styles.modeRow}>
           <Pressable onPress={() => setMode('login')}>
             <Text style={[styles.modeText, mode === 'login' && styles.modeActive]}>{t('login')}</Text>
@@ -75,39 +83,60 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
           <InputField
             label="Full Name"
             value={fullName}
-            onChangeText={(v) => { setFullName(v); setTouched((prev) => ({ ...prev, fullName: true })); }}
-            error={touched.fullName ? errors.fullName : ''}
+            onChangeText={setFullName}
           />
         )}
 
         <InputField
           label="Phone Number"
           value={phone}
-          onChangeText={(v) => { setPhone(v); setTouched((prev) => ({ ...prev, phone: true })); }}
+          onChangeText={setPhone}
           keyboardType="phone-pad"
-          error={touched.phone ? errors.phone : ''}
         />
         <InputField
           label={t('password')}
           value={password}
-          onChangeText={(v) => { setPassword(v); setTouched((prev) => ({ ...prev, password: true })); }}
+          onChangeText={setPassword}
           secureTextEntry
-          error={touched.password ? errors.password : ''}
         />
 
+        {/* Role selector */}
+        <Text style={styles.roleLabel}>Select Your Role</Text>
+        <View style={styles.roleGrid}>
+          {ROLES.map((r) => {
+            const active = role === r.value;
+            return (
+              <Pressable
+                key={r.value}
+                onPress={() => setRole(r.value)}
+                style={[
+                  styles.roleChip,
+                  { borderColor: active ? r.color : '#E5E7EB', backgroundColor: active ? r.bg : '#F9FAFB' },
+                ]}
+              >
+                <Text style={styles.roleIcon}>{r.icon}</Text>
+                <Text style={[styles.roleText, { color: active ? r.color : theme.colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
+                  {r.label}
+                </Text>
+                {active && <View style={[styles.roleDot, { backgroundColor: r.color }]} />}
+              </Pressable>
+            );
+          })}
+        </View>
+
         <PrimaryButton
-          title={loading ? 'Please wait...' : mode === 'login' ? t('login') : t('register')}
+          title={loading ? 'Signing in…' : mode === 'login' ? t('login') : t('register')}
           onPress={handleSubmit}
           disabled={loading}
         />
       </Card>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     padding: theme.spacing.lg,
     backgroundColor: theme.colors.background,
@@ -126,7 +155,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  demoBadge: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  demoBadgeText: {
+    fontSize: 12,
+    color: '#92400E',
+    fontWeight: '600',
   },
   modeRow: {
     flexDirection: 'row',
@@ -145,5 +189,41 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     borderBottomWidth: 2,
     borderBottomColor: theme.colors.primary,
+  },
+  roleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  roleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  roleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    gap: 6,
+    minWidth: '45%',
+    flex: 1,
+  },
+  roleIcon: {
+    fontSize: 16,
+  },
+  roleText: {
+    fontSize: 13,
+    flex: 1,
+  },
+  roleDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
 });
