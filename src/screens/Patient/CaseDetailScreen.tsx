@@ -19,6 +19,7 @@ const RISK_PALETTE: Record<RiskLevel, { bg: string; border: string; text: string
   mild:      { bg: '#15803D', border: '#86EFAC', text: '#FFF',    light: '#F0FDF4', pill: '#DCFCE7' },
   moderate:  { bg: '#B45309', border: '#FCD34D', text: '#FFF',    light: '#FFFBEB', pill: '#FEF9C3' },
   emergency: { bg: '#DC2626', border: '#FCA5A5', text: '#FFF',    light: '#FEF2F2', pill: '#FEE2E2' },
+  pending:   { bg: '#6B7280', border: '#D1D5DB', text: '#FFF',    light: '#F9FAFB', pill: '#F3F4F6' },
 };
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   active:           { bg: '#EBF3FF', text: theme.colors.primary },
