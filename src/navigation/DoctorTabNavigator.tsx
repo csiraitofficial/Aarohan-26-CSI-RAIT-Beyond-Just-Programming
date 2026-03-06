@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { PatientQueueScreen } from '../screens/Doctor/PatientQueueScreen';
 import { PatientHealthDetailsScreen } from '../screens/Doctor/PatientHealthDetailsScreen';
@@ -31,8 +32,8 @@ export type DoctorStackParamList = {
   VideoCallScreen: { roomUrl: string; patientName?: string; consultationId?: string };
 };
 
-const TabIcon = ({ emoji }: { emoji: string }) => (
-  <Text style={{ fontSize: 20 }}>{emoji}</Text>
+const TabIcon = ({ name, color, size }: { name: keyof typeof MaterialCommunityIcons.glyphMap; color: string; size: number }) => (
+  <MaterialCommunityIcons name={name} size={size} color={color} />
 );
 
 /* ─── Stacks inside each tab ─── */
@@ -137,7 +138,7 @@ export const DoctorTabNavigator: React.FC = () => {
         options={{
           title: 'Patient Queue',
           tabBarLabel: 'Queue',
-          tabBarIcon: () => <TabIcon emoji="📋" />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="clipboard-text-outline" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -146,7 +147,7 @@ export const DoctorTabNavigator: React.FC = () => {
         options={{
           title: 'Health Details',
           tabBarLabel: 'Health',
-          tabBarIcon: () => <TabIcon emoji="❤️" />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="heart-outline" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -155,7 +156,7 @@ export const DoctorTabNavigator: React.FC = () => {
         options={{
           title: 'Live Consultation',
           tabBarLabel: 'Consult',
-          tabBarIcon: () => <TabIcon emoji="💬" />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="chat-outline" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -164,7 +165,7 @@ export const DoctorTabNavigator: React.FC = () => {
         options={{
           title: 'E-Prescription',
           tabBarLabel: 'Rx',
-          tabBarIcon: () => <TabIcon emoji="📝" />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="file-document-edit-outline" color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -173,7 +174,7 @@ export const DoctorTabNavigator: React.FC = () => {
         options={{
           title: 'Notifications',
           tabBarLabel: 'Alerts',
-          tabBarIcon: () => <TabIcon emoji="🔔" />,
+          tabBarIcon: ({ color, size }) => <TabIcon name="bell-outline" color={color} size={size} />,
           tabBarBadge: 3,
           tabBarBadgeStyle: styles.badge,
         }}

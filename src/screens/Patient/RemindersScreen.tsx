@@ -3,6 +3,7 @@ import {
   Alert, Dimensions, KeyboardAvoidingView, Modal, Platform,
   Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/types';
@@ -36,10 +37,10 @@ const INIT_APPOINTMENTS: ApptItem[] = [
   { id: 'a3', doctorName: 'Dr. Priya Nair',     specialization: 'Endocrinologist',    date: 'March 20, 2026', time: '03:00 PM', mode: 'in-person', location: 'Fortis Medical Center, Floor 3', initials: 'PN', color: '#16A34A' },
 ];
 const INIT_CHECKUPS: CheckItem[] = [
-  { id: 'c1', type: 'Blood Pressure Check',  date: 'March 10, 2026', location: 'Community Health Center',  icon: '🩺', status: 'pending'   },
-  { id: 'c2', type: 'Blood Sugar Test',      date: 'March 14, 2026', location: 'Pathcare Lab, Sector 5',   icon: '🩸', status: 'pending'   },
-  { id: 'c3', type: 'Chest X-Ray',           date: 'March 7, 2026',  location: 'City Diagnostic Center',   icon: '🫁', status: 'pending'   },
-  { id: 'c4', type: 'Full Body Checkup',     date: 'Feb 20, 2026',   location: 'Apollo Hospital',          icon: '🏥', status: 'completed' },
+  { id: 'c1', type: 'Blood Pressure Check',  date: 'March 10, 2026', location: 'Community Health Center',  icon: 'stethoscope',  status: 'pending'   },
+  { id: 'c2', type: 'Blood Sugar Test',      date: 'March 14, 2026', location: 'Pathcare Lab, Sector 5',   icon: 'water',        status: 'pending'   },
+  { id: 'c3', type: 'Chest X-Ray',           date: 'March 7, 2026',  location: 'City Diagnostic Center',   icon: 'lungs',        status: 'pending'   },
+  { id: 'c4', type: 'Full Body Checkup',     date: 'Feb 20, 2026',   location: 'Apollo Hospital',          icon: 'hospital-building', status: 'completed' },
 ];
 const TODAY_EXTRA = [
   { id: 'e1', name: 'Vitamin D3',  dosage: '1 Tablet', time: '08:00 AM', taken: false, accent: '#7C3AED' },
@@ -119,9 +120,9 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
   const checkupDonePct    = checkups.length > 0 ? Math.round((doneCheckups.length / checkups.length) * 100) : 0;
 
   const TABS: Array<{ key: TabKey; label: string; icon: string; count: number }> = [
-    { key: 'medicines',    label: 'Medicines',     icon: '💊', count: totalMeds                },
-    { key: 'appointments', label: 'Appointments',  icon: '🩺', count: appointments.length      },
-    { key: 'checkups',     label: 'Checkups',      icon: '🔬', count: pendingCheckups.length   },
+    { key: 'medicines',    label: 'Medicines',     icon: 'pill' as const,         count: totalMeds                },
+    { key: 'appointments', label: 'Appointments',  icon: 'stethoscope' as const,  count: appointments.length      },
+    { key: 'checkups',     label: 'Checkups',      icon: 'test-tube' as const,    count: pendingCheckups.length   },
   ];
 
   const confirmDelete = (id: string) =>
@@ -149,7 +150,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
       setAppointments(prev => [...prev, { id: Date.now().toString(), doctorName: apptDoctor, specialization: apptSpec || 'General', date: apptDate, time: apptTime, mode: 'in-person', location: apptLocation || 'TBD', initials, color: '#7C3AED' }]);
     } else {
       if (!checkupType || !checkupDate) { Alert.alert('Missing Info', 'Checkup type and date are required.'); return; }
-      setCheckups(prev => [...prev, { id: Date.now().toString(), type: checkupType, date: checkupDate, location: checkupLocation || 'TBD', icon: '🔬', status: 'pending' }]);
+      setCheckups(prev => [...prev, { id: Date.now().toString(), type: checkupType, date: checkupDate, location: checkupLocation || 'TBD', icon: 'test-tube', status: 'pending' }]);
     }
     resetForm();
     setShowModal(false);
@@ -168,7 +169,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={s.headerSub}>{reminders.filter(r => r.enabled).length} active alerts</Text>
         </View>
         <Pressable style={s.headerBtn} hitSlop={12}>
-          <Text style={s.headerBell}>🔔</Text>
+          <MaterialCommunityIcons name="bell-outline" size={22} color="#FFF" />
           <View style={s.bellDot} />
         </Pressable>
       </View>
@@ -176,22 +177,22 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
       {/* ══════════════ SUMMARY STRIP ══════════════ */}
       <View style={s.summaryStrip}>
         <View style={[s.summaryCard, { borderTopColor: theme.colors.primary }]}>
-          <Text style={s.summaryEmoji}>💊</Text>
+          <MaterialCommunityIcons name="pill" size={16} color={theme.colors.primary} />
           <Text style={s.summaryVal}>{takenCount}/{totalMeds}</Text>
           <Text style={s.summaryLbl}>Meds Today</Text>
         </View>
         <View style={[s.summaryCard, { borderTopColor: '#7C3AED' }]}>
-          <Text style={s.summaryEmoji}>🩺</Text>
+          <MaterialCommunityIcons name="stethoscope" size={16} color="#7C3AED" />
           <Text style={s.summaryVal}>Mar 8</Text>
           <Text style={s.summaryLbl}>Next Appt</Text>
         </View>
         <View style={[s.summaryCard, { borderTopColor: '#16A34A' }]}>
-          <Text style={s.summaryEmoji}>🔬</Text>
+          <MaterialCommunityIcons name="test-tube" size={16} color="#16A34A" />
           <Text style={s.summaryVal}>{pendingCheckups.length}</Text>
           <Text style={s.summaryLbl}>Due Checks</Text>
         </View>
         <View style={[s.summaryCard, { borderTopColor: '#DC2626' }]}>
-          <Text style={s.summaryEmoji}>⚡</Text>
+          <MaterialCommunityIcons name="flash-outline" size={16} color="#DC2626" />
           <Text style={s.summaryVal}>{reminders.filter(r => r.enabled).length}</Text>
           <Text style={s.summaryLbl}>Active</Text>
         </View>
@@ -201,7 +202,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
       <View style={s.tabBar}>
         {TABS.map(tab => (
           <Pressable key={tab.key} style={[s.tabItem, activeTab === tab.key && s.tabItemActive]} onPress={() => setActiveTab(tab.key)}>
-            <Text style={s.tabIcon}>{tab.icon}</Text>
+            <MaterialCommunityIcons name={tab.icon as any} size={14} color={activeTab === tab.key ? '#FFF' : theme.colors.textSecondary} />
             <Text style={[s.tabLabel, activeTab === tab.key && s.tabLabelActive]}>{tab.label}</Text>
             {tab.count > 0 && (
               <View style={[s.tabBadge, activeTab === tab.key && s.tabBadgeActive]}>
@@ -234,34 +235,34 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             {/* Streak / Tips row */}
             <View style={s.tipsRow}>
               <View style={[s.tipChip, { backgroundColor: '#F0FDF4' }]}>
-                <Text style={{ fontSize: 14 }}>🔥</Text>
+                <MaterialCommunityIcons name="fire" size={14} color="#15803D" />
                 <Text style={[s.tipTxt, { color: '#15803D' }]}>3-day streak</Text>
               </View>
               <View style={[s.tipChip, { backgroundColor: '#EBF3FF' }]}>
-                <Text style={{ fontSize: 14 }}>⏰</Text>
+                <MaterialCommunityIcons name="clock-outline" size={14} color={theme.colors.primary} />
                 <Text style={[s.tipTxt, { color: theme.colors.primary }]}>Next: 08:00 AM</Text>
               </View>
               <View style={[s.tipChip, { backgroundColor: '#FFFBEB' }]}>
-                <Text style={{ fontSize: 14 }}>💡</Text>
+                <MaterialCommunityIcons name="lightbulb-outline" size={14} color="#B45309" />
                 <Text style={[s.tipTxt, { color: '#B45309' }]}>Take with food</Text>
               </View>
             </View>
 
             {/* Today's medicines — from context */}
-            <Text style={s.sectionTitle}>📅 Today's Medicines</Text>
+            <Text style={s.sectionTitle}>Today's Medicines</Text>
             {medReminders.map(r => (
               <View key={r.id} style={[s.medCard, { borderLeftColor: r.enabled ? '#16A34A' : theme.colors.primary }]}>
                 <View style={[s.medIconBox, { backgroundColor: r.enabled ? '#F0FDF4' : '#EBF3FF' }]}>
-                  <Text style={{ fontSize: 22 }}>💊</Text>
+                  <MaterialCommunityIcons name="pill" size={22} color={r.enabled ? '#16A34A' : theme.colors.primary} />
                 </View>
                 <View style={s.medInfo}>
                   <Text style={s.medName}>{r.title}</Text>
-                  <Text style={s.medMeta}>⏰ {r.time} · Tap switch to mark taken</Text>
+                  <Text style={s.medMeta}><MaterialCommunityIcons name="clock-outline" size={12} color={theme.colors.textSecondary} /> {r.time} · Tap switch to mark taken</Text>
                 </View>
                 <View style={s.medRight}>
                   <View style={[s.statusChip, { backgroundColor: r.enabled ? '#DCFCE7' : '#EBF3FF' }]}>
                     <Text style={[s.statusChipTxt, { color: r.enabled ? '#15803D' : theme.colors.primary }]}>
-                      {r.enabled ? '✓ Taken' : '◎ Pending'}
+                      {r.enabled ? 'Taken' : 'Pending'}
                     </Text>
                   </View>
                   <Switch
@@ -271,7 +272,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
                     style={{ transform: [{ scale: 0.8 }] }}
                   />
                   <Pressable onPress={() => confirmDelete(r.id)} hitSlop={8}>
-                    <Text style={{ fontSize: 16, color: '#D1D5DB' }}>🗑</Text>
+                    <MaterialCommunityIcons name="delete-outline" size={16} color="#D1D5DB" />
                   </Pressable>
                 </View>
               </View>
@@ -281,30 +282,30 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             {TODAY_EXTRA.map(m => (
               <View key={m.id} style={[s.medCard, { borderLeftColor: m.taken ? '#16A34A' : m.accent }]}>
                 <View style={[s.medIconBox, { backgroundColor: m.taken ? '#F0FDF4' : '#EBF3FF' }]}>
-                  <Text style={{ fontSize: 22 }}>💊</Text>
+                  <MaterialCommunityIcons name="pill" size={22} color={m.taken ? '#16A34A' : theme.colors.primary} />
                 </View>
                 <View style={s.medInfo}>
                   <Text style={s.medName}>{m.name}</Text>
-                  <Text style={s.medMeta}>{m.dosage} · ⏰ {m.time}</Text>
+                  <Text style={s.medMeta}>{m.dosage} · <MaterialCommunityIcons name="clock-outline" size={12} color={theme.colors.textSecondary} /> {m.time}</Text>
                 </View>
                 <View style={[s.statusChip, { backgroundColor: m.taken ? '#DCFCE7' : '#FEF9C3' }]}>
                   <Text style={[s.statusChipTxt, { color: m.taken ? '#15803D' : '#B45309' }]}>
-                    {m.taken ? '✓ Taken' : 'Take Now'}
+                    {m.taken ? 'Taken' : 'Take Now'}
                   </Text>
                 </View>
               </View>
             ))}
 
             {/* Upcoming medicines */}
-            <Text style={[s.sectionTitle, { marginTop: 8 }]}>🕐 Upcoming — Later Today</Text>
+            <Text style={[s.sectionTitle, { marginTop: 8 }]}>Upcoming — Later Today</Text>
             {UPCOMING_EXTRA.map(m => (
               <View key={m.id} style={[s.medCard, { borderLeftColor: m.accent }]}>
                 <View style={[s.medIconBox, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={{ fontSize: 22 }}>💊</Text>
+                  <MaterialCommunityIcons name="pill" size={22} color="#D97706" />
                 </View>
                 <View style={s.medInfo}>
                   <Text style={s.medName}>{m.name}</Text>
-                  <Text style={s.medMeta}>{m.dosage} · ⏰ {m.time}</Text>
+                  <Text style={s.medMeta}>{m.dosage} · <MaterialCommunityIcons name="clock-outline" size={12} color={theme.colors.textSecondary} /> {m.time}</Text>
                 </View>
                 <View style={[s.statusChip, { backgroundColor: '#FEF3C7' }]}>
                   <Text style={[s.statusChipTxt, { color: '#D97706' }]}>Upcoming</Text>
@@ -315,15 +316,15 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             {/* AI Health checks */}
             {aiCheckReminders.length > 0 && (
               <>
-                <Text style={[s.sectionTitle, { marginTop: 8 }]}>🤖 AI Health Checks</Text>
+                <Text style={[s.sectionTitle, { marginTop: 8 }]}>AI Health Checks</Text>
                 {aiCheckReminders.map(r => (
                   <View key={r.id} style={[s.medCard, { borderLeftColor: '#7C3AED' }]}>
                     <View style={[s.medIconBox, { backgroundColor: '#EDE9FE' }]}>
-                      <Text style={{ fontSize: 22 }}>🤖</Text>
+                      <MaterialCommunityIcons name="robot-outline" size={22} color="#7C3AED" />
                     </View>
                     <View style={s.medInfo}>
                       <Text style={s.medName}>{r.title}</Text>
-                      <Text style={s.medMeta}>⏰ {r.time} · Symptom check</Text>
+                      <Text style={s.medMeta}><MaterialCommunityIcons name="clock-outline" size={12} color={theme.colors.textSecondary} /> {r.time} · Symptom check</Text>
                     </View>
                     <Switch
                       value={r.enabled} onValueChange={() => toggleReminder(r.id)}
@@ -350,7 +351,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <View style={[s.modeBadge, { backgroundColor: nextAppt.mode === 'online' ? '#EBF3FF' : '#F0FDF4' }]}>
                     <Text style={[s.modeBadgeTxt, { color: nextAppt.mode === 'online' ? theme.colors.primary : '#15803D' }]}>
-                      {nextAppt.mode === 'online' ? '📱 Online' : '🏥 In-Person'}
+                      {nextAppt.mode === 'online' ? 'Online' : 'In-Person'}
                     </Text>
                   </View>
                 </View>
@@ -364,9 +365,9 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                 </View>
                 <View style={s.heroApptMeta}>
-                  <View style={s.heroMetaItem}><Text style={s.heroMetaIcon}>📅</Text><Text style={s.heroMetaTxt}>{nextAppt.date}</Text></View>
-                  <View style={s.heroMetaItem}><Text style={s.heroMetaIcon}>⏰</Text><Text style={s.heroMetaTxt}>{nextAppt.time}</Text></View>
-                  <View style={[s.heroMetaItem, { flex: 2 }]}><Text style={s.heroMetaIcon}>📍</Text><Text style={s.heroMetaTxt} numberOfLines={1}>{nextAppt.location}</Text></View>
+                  <View style={s.heroMetaItem}><MaterialCommunityIcons name="calendar-outline" size={13} color={theme.colors.textSecondary} /><Text style={s.heroMetaTxt}>{nextAppt.date}</Text></View>
+                  <View style={s.heroMetaItem}><MaterialCommunityIcons name="clock-outline" size={13} color={theme.colors.textSecondary} /><Text style={s.heroMetaTxt}>{nextAppt.time}</Text></View>
+                  <View style={[s.heroMetaItem, { flex: 2 }]}><MaterialCommunityIcons name="map-marker-outline" size={13} color={theme.colors.textSecondary} /><Text style={s.heroMetaTxt} numberOfLines={1}>{nextAppt.location}</Text></View>
                 </View>
                 <View style={s.heroApptBtns}>
                   <Pressable style={s.viewDetailBtn}>
@@ -374,11 +375,11 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
                   </Pressable>
                   {nextAppt.mode === 'online' ? (
                     <Pressable style={s.joinCallBtn}>
-                      <Text style={s.joinCallTxt}>📹 Join Call</Text>
+                      <Text style={s.joinCallTxt}>Join Call</Text>
                     </Pressable>
                   ) : (
                     <Pressable style={s.joinCallBtn}>
-                      <Text style={s.joinCallTxt}>🗺 Get Directions</Text>
+                      <Text style={s.joinCallTxt}>Get Directions</Text>
                     </Pressable>
                   )}
                 </View>
@@ -386,7 +387,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             )}
 
             {/* All appointments list */}
-            <Text style={s.sectionTitle}>📋 All Appointments</Text>
+            <Text style={s.sectionTitle}>All Appointments</Text>
             {appointments.map((a, idx) => (
               <View key={a.id} style={[s.apptCard, idx === 0 && { borderWidth: 1.5, borderColor: a.color + '50' }]}>
                 <View style={[s.apptAvatarSm, { backgroundColor: a.color }]}>
@@ -399,14 +400,14 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <Text style={s.apptSpec}>{a.specialization}</Text>
                   <View style={s.apptMetaRow}>
-                    <Text style={s.apptMetaTxt}>📅 {a.date}</Text>
+                    <Text style={s.apptMetaTxt}><MaterialCommunityIcons name="calendar-outline" size={12} color={theme.colors.textSecondary} /> {a.date}</Text>
                     <Text style={s.apptDot}>·</Text>
-                    <Text style={s.apptMetaTxt}>⏰ {a.time}</Text>
+                    <Text style={s.apptMetaTxt}><MaterialCommunityIcons name="clock-outline" size={12} color={theme.colors.textSecondary} /> {a.time}</Text>
                   </View>
-                  <Text style={s.apptLoc} numberOfLines={1}>📍 {a.location}</Text>
+                  <Text style={s.apptLoc} numberOfLines={1}><MaterialCommunityIcons name="map-marker-outline" size={12} color={theme.colors.textSecondary} /> {a.location}</Text>
                 </View>
                 <View style={[s.modeBadgeSm, { backgroundColor: a.mode === 'online' ? '#EBF3FF' : '#F0FDF4' }]}>
-                  <Text style={{ fontSize: 18 }}>{a.mode === 'online' ? '📱' : '🏥'}</Text>
+                  <MaterialCommunityIcons name={a.mode === 'online' ? 'cellphone' : 'hospital-building'} size={18} color={a.mode === 'online' ? theme.colors.primary : '#15803D'} />
                 </View>
               </View>
             ))}
@@ -414,15 +415,15 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             {/* Follow-up reminders from context */}
             {followUpReminders.length > 0 && (
               <>
-                <Text style={[s.sectionTitle, { marginTop: 8 }]}>📞 Follow-up Reminders</Text>
+                <Text style={[s.sectionTitle, { marginTop: 8 }]}>Follow-up Reminders</Text>
                 {followUpReminders.map(r => (
                   <View key={r.id} style={[s.medCard, { borderLeftColor: '#7C3AED' }]}>
                     <View style={[s.medIconBox, { backgroundColor: '#EDE9FE' }]}>
-                      <Text style={{ fontSize: 22 }}>🩺</Text>
+                      <MaterialCommunityIcons name="stethoscope" size={22} color="#7C3AED" />
                     </View>
                     <View style={s.medInfo}>
                       <Text style={s.medName}>{r.title}</Text>
-                      <Text style={s.medMeta}>⏰ {r.time}</Text>
+                      <Text style={s.medMeta}><MaterialCommunityIcons name="clock-outline" size={12} color={theme.colors.textSecondary} /> {r.time}</Text>
                     </View>
                     <Switch
                       value={r.enabled} onValueChange={() => toggleReminder(r.id)}
@@ -463,7 +464,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             {/* Health score card */}
             <View style={[s.card, { backgroundColor: '#EBF3FF', borderWidth: 1, borderColor: '#BFDBFE' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Text style={{ fontSize: 36 }}>💙</Text>
+                <MaterialCommunityIcons name="heart-pulse" size={36} color={theme.colors.primary} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '900', color: theme.colors.primary }}>Health Score: 78/100</Text>
                   <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>
@@ -474,23 +475,23 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             {/* Pending checkups */}
-            <Text style={s.sectionTitle}>⏳ Upcoming Checkups</Text>
+            <Text style={s.sectionTitle}>Upcoming Checkups</Text>
             {pendingCheckups.map(c => (
               <View key={c.id} style={s.checkupCard}>
                 <View style={s.checkupIconBox}>
-                  <Text style={{ fontSize: 24 }}>{c.icon}</Text>
+                  <MaterialCommunityIcons name={c.icon as any} size={24} color={theme.colors.primary} />
                 </View>
                 <View style={s.checkupInfo}>
                   <Text style={s.checkupType}>{c.type}</Text>
-                  <Text style={s.checkupMeta}>📅 {c.date}</Text>
-                  <Text style={s.checkupLoc}>📍 {c.location}</Text>
+                  <Text style={s.checkupMeta}><MaterialCommunityIcons name="calendar-outline" size={12} color={theme.colors.textSecondary} /> {c.date}</Text>
+                  <Text style={s.checkupLoc}><MaterialCommunityIcons name="map-marker-outline" size={12} color={theme.colors.textSecondary} /> {c.location}</Text>
                 </View>
                 <View style={s.checkupActions}>
                   <Pressable style={s.markDoneBtn} onPress={() => markCheckupDone(c.id)}>
-                    <Text style={s.markDoneTxt}>✓ Done</Text>
+                    <Text style={s.markDoneTxt}>Done</Text>
                   </Pressable>
                   <Pressable style={s.remapBtn}>
-                    <Text style={s.remapTxt}>📅</Text>
+                    <MaterialCommunityIcons name="calendar-outline" size={16} color={theme.colors.primary} />
                   </Pressable>
                 </View>
               </View>
@@ -499,19 +500,19 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             {/* Completed checkups */}
             {doneCheckups.length > 0 && (
               <>
-                <Text style={[s.sectionTitle, { marginTop: 8 }]}>✅ Completed</Text>
+                <Text style={[s.sectionTitle, { marginTop: 8 }]}>Completed</Text>
                 {doneCheckups.map(c => (
                   <View key={c.id} style={[s.checkupCard, { opacity: 0.65 }]}>
                     <View style={[s.checkupIconBox, { backgroundColor: '#F0FDF4' }]}>
-                      <Text style={{ fontSize: 24 }}>{c.icon}</Text>
+                      <MaterialCommunityIcons name={c.icon as any} size={24} color="#16A34A" />
                     </View>
                     <View style={s.checkupInfo}>
                       <Text style={s.checkupType}>{c.type}</Text>
-                      <Text style={s.checkupMeta}>📅 {c.date}</Text>
-                      <Text style={s.checkupLoc}>📍 {c.location}</Text>
+                      <Text style={s.checkupMeta}><MaterialCommunityIcons name="calendar-outline" size={12} color={theme.colors.textSecondary} /> {c.date}</Text>
+                      <Text style={s.checkupLoc}><MaterialCommunityIcons name="map-marker-outline" size={12} color={theme.colors.textSecondary} /> {c.location}</Text>
                     </View>
                     <View style={s.doneBadge}>
-                      <Text style={s.doneBadgeTxt}>✓ Done</Text>
+                      <Text style={s.doneBadgeTxt}>Done</Text>
                     </View>
                   </View>
                 ))}
@@ -536,7 +537,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             <View style={s.modalHeaderRow}>
               <Text style={s.modalTitle}>Add Reminder</Text>
               <Pressable onPress={() => setShowModal(false)} hitSlop={12}>
-                <Text style={{ fontSize: 22, color: theme.colors.textSecondary }}>✕</Text>
+                <MaterialCommunityIcons name="close" size={22} color={theme.colors.textSecondary} />
               </Pressable>
             </View>
 
@@ -544,7 +545,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
             <View style={s.formTypeSel}>
               {(['medicine', 'appointment', 'checkup'] as FormType[]).map(ft => (
                 <Pressable key={ft} style={[s.formTypeBtn, formType === ft && s.formTypeBtnActive]} onPress={() => setFormType(ft)}>
-                  <Text style={{ fontSize: 22 }}>{ft === 'medicine' ? '💊' : ft === 'appointment' ? '🩺' : '🔬'}</Text>
+                  <MaterialCommunityIcons name={ft === 'medicine' ? 'pill' : ft === 'appointment' ? 'stethoscope' : 'test-tube'} size={22} color={formType === ft ? theme.colors.primary : theme.colors.textSecondary} />
                   <Text style={[s.formTypeTxt, formType === ft && s.formTypeTxtActive]}>
                     {ft === 'medicine' ? 'Medicine' : ft === 'appointment' ? 'Appointment' : 'Checkup'}
                   </Text>
@@ -578,7 +579,7 @@ export const RemindersScreen: React.FC<Props> = ({ navigation }) => {
                 </>
               )}
               <Pressable style={s.saveBtn} onPress={handleSave}>
-                <Text style={s.saveBtnTxt}>💾  Save Reminder</Text>
+                <Text style={s.saveBtnTxt}>Save Reminder</Text>
               </Pressable>
               <View style={{ height: 32 }} />
             </ScrollView>

@@ -1,4 +1,31 @@
-const BASE_URL = 'http://192.168.137.174:8000';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+// Computes the backend URL lazily (called on first request, not at import time).
+// This ensures Constants is fully initialized before we read debuggerHost.
+let _baseUrl: string | null = null;
+export function getBaseUrl(): string {
+  if (_baseUrl) return _baseUrl;
+  if (Platform.OS === 'web') {
+    _baseUrl = 'http://localhost:8000';
+    return _baseUrl;
+  }
+  // Try Expo SDK 49+ path first, then legacy manifest path
+  const debuggerHost: string | undefined =
+    (Constants.expoGoConfig as any)?.debuggerHost ??
+    (Constants as any).manifest2?.debuggerHost ??
+    (Constants as any).manifest?.debuggerHost;
+  if (debuggerHost) {
+    const ip = debuggerHost.split(':')[0];
+    // Only use a numeric LAN IP — ignore tunnel hostnames
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+      _baseUrl = `http://${ip}:8000`;
+      return _baseUrl;
+    }
+  }
+  _baseUrl = 'http://192.168.137.192:8000';
+  return _baseUrl;
+}
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -6,15 +33,38 @@ type RequestOptions = {
   token?: string;
 };
 
+const TIMEOUT_MS = 5000;
+
+function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  return Promise.race([
+    fetch(url, init),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('No response from server. Make sure your phone is on the same WiFi as this machine.')),
+        TIMEOUT_MS,
+      )
+    ),
+  ]);
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {})
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
+  const BASE_URL = getBaseUrl();
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${BASE_URL}${path}`, {
+      method: options.method ?? 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (err: any) {
+    throw new Error(
+      (err?.message ?? 'Cannot reach the server.') +
+      `\n\nBackend URL: ${BASE_URL}\nMake sure your phone is on the same WiFi as this PC.`
+    );
+  }
 
   if (!response.ok) {
     let errorMessage = `Request failed with status ${response.status}`;
@@ -22,10 +72,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       const errorData = await response.json();
       errorMessage = errorData.detail || errorData.message || errorMessage;
     } catch {
-      // If JSON parsing fails, use the default message
+      // ignore parse errors
     }
-    
-    // Special handling for common errors
+
     if (response.status === 401) {
       throw new Error('Authentication required. Please log in again.');
     } else if (response.status === 403) {
@@ -35,7 +84,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } else if (response.status >= 500) {
       throw new Error('Server error. Please try again later.');
     }
-    
+
     throw new Error(errorMessage);
   }
 

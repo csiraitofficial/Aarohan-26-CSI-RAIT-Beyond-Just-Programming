@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../../utils/theme';
@@ -48,7 +49,7 @@ export const VideoCallScreen: React.FC<Props> = ({ navigation, route }) => {
   if (!roomUrl) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorIcon}>⚠️</Text>
+        <MaterialCommunityIcons name="alert-outline" size={40} color="#D97706" />
         <Text style={styles.errorTitle}>No Video Room</Text>
         <Text style={styles.errorText}>
           No video call room URL was provided. Please try again.
@@ -107,7 +108,7 @@ export const VideoCallScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Error overlay */}
       {error && (
         <View style={styles.loadingOverlay}>
-          <Text style={styles.errorIcon}>❌</Text>
+          <MaterialCommunityIcons name="close-circle-outline" size={40} color="#DC2626" />
           <Text style={styles.loadingText}>Failed to load video call</Text>
           <Text style={styles.errorDetail}>{error}</Text>
           <Pressable
@@ -125,7 +126,7 @@ export const VideoCallScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Floating End Call button */}
       <View style={styles.controlBar}>
         <Pressable style={styles.endCallBtn} onPress={handleEndCall}>
-          <Text style={styles.endCallIcon}>📞</Text>
+          <MaterialCommunityIcons name="phone-hangup" size={22} color="#FFF" />
           <Text style={styles.endCallText}>End Call</Text>
         </Pressable>
       </View>

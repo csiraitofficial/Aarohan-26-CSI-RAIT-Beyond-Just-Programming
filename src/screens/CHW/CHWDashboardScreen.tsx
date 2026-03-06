@@ -1,12 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { AppState, AppStateStatus, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card } from '../../components/ui/Card';
 import { theme } from '../../utils/theme';
 import { LogoutButton } from '../../components/ui/LogoutButton';
 
+const TILE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  'Home Visits': 'home-outline',
+  'Case Notes': 'clipboard-text-outline',
+  'Vitals Entry': 'test-tube',
+  'Sync Queue': 'cloud-sync-outline',
+};
+
 const Tile: React.FC<{ icon: string; title: string; onPress?: () => void }> = ({ icon, title, onPress }) => (
   <Pressable style={styles.tile} onPress={onPress}>
-    <Text style={styles.tileIcon}>{icon}</Text>
+    <View style={styles.tileIconWrap}>
+      <MaterialCommunityIcons name={TILE_ICONS[title] || 'help-circle-outline'} size={28} color={theme.colors.primary} />
+    </View>
     <Text style={styles.tileText}>{title}</Text>
   </Pressable>
 );
@@ -53,10 +63,10 @@ export const CHWDashboardScreen: React.FC = () => {
         ) : null}
 
         <View style={styles.grid}>
-          <Tile icon="🏠" title="Home Visits" />
-          <Tile icon="📋" title="Case Notes" />
-          <Tile icon="🧪" title="Vitals Entry" />
-          <Tile icon="📶" title="Sync Queue" />
+          <Tile icon="home-outline" title="Home Visits" />
+          <Tile icon="clipboard-text-outline" title="Case Notes" />
+          <Tile icon="test-tube" title="Vitals Entry" />
+          <Tile icon="cloud-sync-outline" title="Sync Queue" />
         </View>
       </ScrollView>
     </>
@@ -97,9 +107,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-  tileIcon: {
-    fontSize: 28,
-    marginBottom: 10
+  tileIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: theme.colors.primary + '12',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
   tileText: {
     fontWeight: '700',

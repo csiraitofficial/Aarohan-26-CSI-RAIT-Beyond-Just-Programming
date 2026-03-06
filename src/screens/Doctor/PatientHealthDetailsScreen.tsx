@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { theme } from '../../utils/theme';
 
 /* ─── Mock Patient Data ─── */
@@ -119,11 +120,11 @@ const DRUG_INTERACTIONS: Array<{
 type TabKey = 'symptoms' | 'vitals' | 'history' | 'reports' | 'medications';
 
 const TABS: Array<{ key: TabKey; label: string; icon: string }> = [
-  { key: 'symptoms', label: 'Symptoms', icon: '🩺' },
-  { key: 'vitals', label: 'Vitals', icon: '❤️' },
-  { key: 'history', label: 'History', icon: '📂' },
-  { key: 'reports', label: 'Reports', icon: '📄' },
-  { key: 'medications', label: 'Meds', icon: '💊' },
+  { key: 'symptoms', label: 'Symptoms', icon: 'stethoscope' },
+  { key: 'vitals', label: 'Vitals', icon: 'heart-outline' },
+  { key: 'history', label: 'History', icon: 'folder-outline' },
+  { key: 'reports', label: 'Reports', icon: 'file-document-outline' },
+  { key: 'medications', label: 'Meds', icon: 'pill' },
 ];
 
 export const PatientHealthDetailsScreen: React.FC = () => {
@@ -143,7 +144,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
         <View style={styles.drugAlert}>
           <View style={styles.drugAlertHeader}>
             <View style={styles.drugAlertIconContainer}>
-              <Text style={{ fontSize: 20 }}>⚠️</Text>
+              <MaterialCommunityIcons name="alert-outline" size={20} color="#92400E" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.drugAlertTitle}>Drug Interaction Warning</Text>
@@ -152,7 +153,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
               </Text>
             </View>
             <Pressable onPress={() => setShowDrugAlert(false)} style={styles.drugAlertClose}>
-              <Text style={{ color: '#92400E', fontSize: 16 }}>✕</Text>
+              <MaterialCommunityIcons name="close" size={16} color="#92400E" />
             </Pressable>
           </View>
           {DRUG_INTERACTIONS.filter((d) => d.severity === 'high').map((interaction, i) => (
@@ -176,7 +177,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
         <View style={styles.profileHeader}>
           <View style={styles.profileAvatarContainer}>
             <View style={styles.profileAvatar}>
-              <Text style={{ fontSize: 32 }}>{PATIENT.gender === 'M' ? '👨' : '👩'}</Text>
+              <MaterialCommunityIcons name="account" size={32} color={theme.colors.primary} />
             </View>
             <View style={styles.onlineIndicator} />
           </View>
@@ -194,10 +195,10 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
         {/* Quick Info Grid */}
         <View style={styles.quickInfoGrid}>
-          <QuickInfoItem icon="📍" label="Location" value={PATIENT.location} />
-          <QuickInfoItem icon="📞" label="Phone" value={PATIENT.phone} />
-          <QuickInfoItem icon="🆘" label="Emergency" value={PATIENT.emergencyContact} />
-          <QuickInfoItem icon="🏥" label="Insurance" value={PATIENT.insuranceId} />
+          <QuickInfoItem icon="map-marker-outline" label="Location" value={PATIENT.location} />
+          <QuickInfoItem icon="phone-outline" label="Phone" value={PATIENT.phone} />
+          <QuickInfoItem icon="alert-circle-outline" label="Emergency" value={PATIENT.emergencyContact} />
+          <QuickInfoItem icon="hospital-building" label="Insurance" value={PATIENT.insuranceId} />
         </View>
       </View>
 
@@ -209,7 +210,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
         contentContainerStyle={styles.vitalsStripContent}
       >
         <VitalStripItem
-          icon="💓"
+          icon="heart-pulse"
           label="Heart Rate"
           value={`${PATIENT.vitals.heartRate}`}
           unit="bpm"
@@ -217,7 +218,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
           trend="up"
         />
         <VitalStripItem
-          icon="🩸"
+          icon="water"
           label="Blood Pressure"
           value={PATIENT.vitals.bloodPressure}
           unit="mmHg"
@@ -225,7 +226,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
           trend="up"
         />
         <VitalStripItem
-          icon="🌡️"
+          icon="thermometer"
           label="Temp"
           value={`${PATIENT.vitals.temperature}`}
           unit="°F"
@@ -233,7 +234,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
           trend="stable"
         />
         <VitalStripItem
-          icon="🌬"
+          icon="weather-windy"
           label="Resp Rate"
           value={`${PATIENT.vitals.respiratoryRate}`}
           unit="/min"
@@ -241,7 +242,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
           trend="up"
         />
         <VitalStripItem
-          icon="🍬"
+          icon="candy-outline"
           label="Blood Sugar"
           value={`${PATIENT.vitals.bloodSugar}`}
           unit="mg/dL"
@@ -259,7 +260,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
               onPress={() => setActiveTab(tab.key)}
               style={[styles.tab, activeTab === tab.key && styles.tabActive]}
             >
-              <Text style={{ fontSize: 16 }}>{tab.icon}</Text>
+              <MaterialCommunityIcons name={tab.icon as any} size={16} color={activeTab === tab.key ? theme.colors.primary : theme.colors.textSecondary} />
               <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
                 {tab.label}
               </Text>
@@ -273,7 +274,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
         {activeTab === 'symptoms' && (
           <View>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>🩺 Symptoms Summary</Text>
+              <Text style={styles.sectionTitle}>Symptoms Summary</Text>
               <View style={styles.symptomCount}>
                 <Text style={styles.symptomCountText}>{PATIENT.symptoms.length} Active</Text>
               </View>
@@ -292,7 +293,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                     </View>
                   </View>
                   <View style={styles.symptomDetails}>
-                    <Text style={styles.symptomDuration}>⏱ Duration: {symptom.duration}</Text>
+                    <Text style={styles.symptomDuration}><MaterialCommunityIcons name="clock-outline" size={12} color={theme.colors.textSecondary} /> Duration: {symptom.duration}</Text>
                   </View>
                 </View>
               );
@@ -301,7 +302,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
             {/* AI Assessment Summary */}
             <View style={styles.aiAssessmentCard}>
               <View style={styles.aiAssessmentHeader}>
-                <Text style={{ fontSize: 20 }}>🤖</Text>
+                <MaterialCommunityIcons name="robot-outline" size={20} color={theme.colors.primary} />
                 <Text style={styles.aiAssessmentTitle}>AI Clinical Assessment</Text>
               </View>
               <View style={styles.aiAssessmentBody}>
@@ -314,15 +315,15 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                 <View style={styles.aiAssessmentFlags}>
                   <Text style={styles.aiFlagTitle}>Red Flags Detected:</Text>
                   <View style={styles.aiFlagItem}>
-                    <Text style={{ color: '#DC2626' }}>⚡</Text>
+                    <MaterialCommunityIcons name="flash" size={14} color="#DC2626" />
                     <Text style={styles.aiFlagText}>SpO₂ below 90% — Critical oxygen levels</Text>
                   </View>
                   <View style={styles.aiFlagItem}>
-                    <Text style={{ color: '#DC2626' }}>⚡</Text>
+                    <MaterialCommunityIcons name="flash" size={14} color="#DC2626" />
                     <Text style={styles.aiFlagText}>Tachycardia with chest pain — Cardiac risk</Text>
                   </View>
                   <View style={styles.aiFlagItem}>
-                    <Text style={{ color: '#DC2626' }}>⚡</Text>
+                    <MaterialCommunityIcons name="flash" size={14} color="#DC2626" />
                     <Text style={styles.aiFlagText}>History of hypertension + diabetes — Compounding factors</Text>
                   </View>
                 </View>
@@ -333,10 +334,10 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
         {activeTab === 'vitals' && (
           <View>
-            <Text style={styles.sectionTitle}>❤️ Detailed Vitals</Text>
+            <Text style={styles.sectionTitle}>Detailed Vitals</Text>
             <View style={styles.vitalsDetailGrid}>
               <VitalDetailCard
-                icon="💓"
+                icon="heart-pulse"
                 label="Heart Rate"
                 value={`${PATIENT.vitals.heartRate}`}
                 unit="bpm"
@@ -344,7 +345,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                 status={PATIENT.vitals.heartRate > 100 ? 'critical' : 'normal'}
               />
               <VitalDetailCard
-                icon="🩸"
+                icon="water"
                 label="Blood Pressure"
                 value={PATIENT.vitals.bloodPressure}
                 unit="mmHg"
@@ -352,7 +353,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                 status="critical"
               />
               <VitalDetailCard
-                icon="🌡️"
+                icon="thermometer"
                 label="Temperature"
                 value={`${PATIENT.vitals.temperature}`}
                 unit="°F"
@@ -360,7 +361,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                 status={PATIENT.vitals.temperature > 100.4 ? 'warning' : 'normal'}
               />
               <VitalDetailCard
-                icon="🌬"
+                icon="weather-windy"
                 label="Resp. Rate"
                 value={`${PATIENT.vitals.respiratoryRate}`}
                 unit="/min"
@@ -368,7 +369,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                 status={PATIENT.vitals.respiratoryRate > 20 ? 'warning' : 'normal'}
               />
               <VitalDetailCard
-                icon="🍬"
+                icon="candy-outline"
                 label="Blood Sugar"
                 value={`${PATIENT.vitals.bloodSugar}`}
                 unit="mg/dL"
@@ -379,7 +380,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
             {/* Vitals Trend Mini-chart placeholder */}
             <View style={styles.trendCard}>
-              <Text style={styles.trendTitle}>📈 Vitals Trend (Last 7 Days)</Text>
+              <Text style={styles.trendTitle}>Vitals Trend (Last 7 Days)</Text>
               <View style={styles.trendChart}>
                 <View style={styles.trendRow}>
                   <Text style={styles.trendLabel}>HR</Text>
@@ -402,7 +403,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
         {activeTab === 'history' && (
           <View>
-            <Text style={styles.sectionTitle}>📂 Medical History</Text>
+            <Text style={styles.sectionTitle}>Medical History</Text>
             {PATIENT.medicalHistory.map((item, i) => (
               <View key={i} style={styles.historyCard}>
                 <View style={styles.historyCardHeader}>
@@ -437,14 +438,14 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
             {/* Allergies */}
             <View style={styles.allergySectionCard}>
-              <Text style={styles.allergySectionTitle}>⚠️ Allergies & Sensitivities</Text>
+              <Text style={styles.allergySectionTitle}>Allergies & Sensitivities</Text>
               {PATIENT.allergies.map((allergy, i) => {
                 const sev = SEVERITY_COLORS[allergy.severity];
                 return (
                   <View key={i} style={styles.allergyDetailCard}>
                     <View style={styles.allergyDetailHeader}>
                       <View style={[styles.allergyIcon, { backgroundColor: sev.bg }]}>
-                        <Text style={{ fontSize: 16 }}>⚠️</Text>
+                        <MaterialCommunityIcons name="alert-outline" size={16} color={sev.color} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.allergySubstance}>{allergy.substance}</Text>
@@ -463,7 +464,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
             {/* Past Visits */}
             <View style={{ marginTop: 16 }}>
-              <Text style={styles.sectionTitle}>🏥 Past Visits</Text>
+              <Text style={styles.sectionTitle}>Past Visits</Text>
               {PATIENT.pastVisits.map((visit, i) => (
                 <View key={i} style={styles.visitCard}>
                   <View style={styles.visitTimeline}>
@@ -483,13 +484,11 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
         {activeTab === 'reports' && (
           <View>
-            <Text style={styles.sectionTitle}>📄 Medical Reports</Text>
+            <Text style={styles.sectionTitle}>Medical Reports</Text>
             {PATIENT.reports.map((report, i) => (
               <Pressable key={i} style={styles.reportCard}>
                 <View style={styles.reportIcon}>
-                  <Text style={{ fontSize: 22 }}>
-                    {report.type === 'Blood Test' ? '🩸' : report.type === 'Cardiac' ? '❤️' : '📷'}
-                  </Text>
+                  <MaterialCommunityIcons name={report.type === 'Blood Test' ? 'water' : report.type === 'Cardiac' ? 'heart-outline' : 'camera-outline'} size={22} color={theme.colors.primary} />
                 </View>
                 <View style={styles.reportInfo}>
                   <Text style={styles.reportName}>{report.name}</Text>
@@ -523,11 +522,11 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
         {activeTab === 'medications' && (
           <View>
-            <Text style={styles.sectionTitle}>💊 Current Medications</Text>
+            <Text style={styles.sectionTitle}>Current Medications</Text>
             {PATIENT.currentMedications.map((med, i) => (
               <View key={i} style={styles.medCard}>
                 <View style={styles.medIcon}>
-                  <Text style={{ fontSize: 20 }}>💊</Text>
+                  <MaterialCommunityIcons name="pill" size={20} color={theme.colors.primary} />
                 </View>
                 <View style={styles.medInfo}>
                   <Text style={styles.medName}>{med.name}</Text>
@@ -539,7 +538,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                   (d) => d.drug1 === med.name || d.drug2 === med.name
                 ) && (
                   <View style={styles.medWarning}>
-                    <Text style={{ fontSize: 14 }}>⚠️</Text>
+                    <MaterialCommunityIcons name="alert-outline" size={14} color="#D97706" />
                   </View>
                 )}
               </View>
@@ -547,7 +546,7 @@ export const PatientHealthDetailsScreen: React.FC = () => {
 
             {/* Drug Interaction Detail */}
             <View style={styles.interactionSection}>
-              <Text style={styles.interactionTitle}>🔬 Known Interactions</Text>
+              <Text style={styles.interactionTitle}>Known Interactions</Text>
               {DRUG_INTERACTIONS.map((interaction, i) => (
                 <View key={i} style={styles.interactionCard}>
                   <View style={styles.interactionHeader}>
@@ -594,15 +593,15 @@ export const PatientHealthDetailsScreen: React.FC = () => {
       {/* ─── Quick Action Footer ─── */}
       <View style={styles.quickActionFooter}>
         <Pressable style={[styles.footerBtn, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.footerBtnIcon}>💬</Text>
+          <Text style={styles.footerBtnIcon}><MaterialCommunityIcons name="chat-outline" size={18} color="#FFF" /></Text>
           <Text style={styles.footerBtnText}>Start Consultation</Text>
         </Pressable>
         <Pressable style={[styles.footerBtn, { backgroundColor: '#059669' }]}>
-          <Text style={styles.footerBtnIcon}>📝</Text>
+          <Text style={styles.footerBtnIcon}><MaterialCommunityIcons name="note-edit-outline" size={18} color="#FFF" /></Text>
           <Text style={styles.footerBtnText}>E-Prescription</Text>
         </Pressable>
         <Pressable style={[styles.footerBtn, { backgroundColor: '#DC2626' }]}>
-          <Text style={styles.footerBtnIcon}>🚨</Text>
+          <Text style={styles.footerBtnIcon}><MaterialCommunityIcons name="alert-circle-outline" size={18} color="#FFF" /></Text>
           <Text style={styles.footerBtnText}>Emergency Alert</Text>
         </Pressable>
       </View>
@@ -622,7 +621,7 @@ const QuickInfoItem: React.FC<{ icon: string; label: string; value: string }> = 
   value,
 }) => (
   <View style={styles.quickInfoItem}>
-    <Text style={{ fontSize: 14 }}>{icon}</Text>
+    <MaterialCommunityIcons name={icon as any} size={14} color={theme.colors.primary} />
     <View>
       <Text style={styles.quickInfoLabel}>{label}</Text>
       <Text style={styles.quickInfoValue}>{value}</Text>
@@ -640,7 +639,7 @@ const VitalStripItem: React.FC<{
 }> = ({ icon, label, value, unit, alert, trend }) => (
   <View style={[styles.vitalStripItem, alert && styles.vitalStripItemAlert]}>
     <View style={styles.vitalStripTop}>
-      <Text style={{ fontSize: 18 }}>{icon}</Text>
+      <MaterialCommunityIcons name={icon as any} size={18} color={alert ? '#DC2626' : theme.colors.primary} />
       <Text style={{ fontSize: 12, color: trend === 'up' ? '#DC2626' : trend === 'down' ? '#3B82F6' : '#059669' }}>
         {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'}
       </Text>
@@ -671,7 +670,7 @@ const VitalDetailCard: React.FC<{
       <View style={[styles.vitalDetailStatus, { backgroundColor: cfg.bg }]}>
         <Text style={{ fontSize: 8, color: cfg.color, fontWeight: '800' }}>{cfg.label}</Text>
       </View>
-      <Text style={{ fontSize: 24 }}>{icon}</Text>
+      <MaterialCommunityIcons name={icon as any} size={24} color={cfg.color} />
       <Text style={[styles.vitalDetailValue, { color: cfg.color }]}>{value}</Text>
       <Text style={styles.vitalDetailUnit}>{unit}</Text>
       <Text style={styles.vitalDetailLabel}>{label}</Text>
