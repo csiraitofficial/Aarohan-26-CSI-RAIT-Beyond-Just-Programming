@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Google Gemini
     GEMINI_API_KEY: str = "your_gemini_api_key_here"
 
+    # AssemblyAI Speech-to-Text
+    ASSEMBLYAI_API_KEY: str = "your_assemblyai_api_key_here"
+
     # JWT
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"

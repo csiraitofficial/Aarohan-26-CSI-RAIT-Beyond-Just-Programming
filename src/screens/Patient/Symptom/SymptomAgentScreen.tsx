@@ -17,6 +17,8 @@ import { usePatient } from '../../../context/PatientContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { ChatMessage } from '../../../models';
+import { VoiceRecorder } from '../../../components/ui/VoiceRecorder';
+import { LanguageCode } from '../../../i18n/translations';
 import {
   startSymptomSession,
   respondToAgent,
@@ -29,6 +31,13 @@ type Props = NativeStackScreenProps<PatientStackParamList, 'SymptomAgentScreen'>
 type ConvoState = 'initial' | 'chatting' | 'analyzing' | 'complete';
 
 const MAX_QUESTIONS = 6;
+
+/* ─── Language options for the chat session ─── */
+const LANGUAGE_OPTIONS: { code: LanguageCode; label: string; nativeLabel: string; flag: string }[] = [
+  { code: 'en', label: 'English', nativeLabel: 'English', flag: '🇬🇧' },
+  { code: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'ta', label: 'Tamil', nativeLabel: 'தமிழ்', flag: '🇮🇳' },
+];
 
 /* ─── Quick illness chips shown on welcome screen ─── */
 const QUICK_SYMPTOMS = [
@@ -103,7 +112,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
     addCase,
   } = usePatient();
   const { token, userId } = useAuth();
-  const { language } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
   const [convoState, setConvoState] = useState<ConvoState>('initial');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -113,6 +122,8 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentOptions, setCurrentOptions] = useState<string[] | null>(null);
   const [showTextInput, setShowTextInput] = useState(false);
+  const [chatLanguage, setChatLanguage] = useState<LanguageCode>(language);
+  const [showVoice, setShowVoice] = useState(false);
 
   const flatRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
@@ -228,7 +239,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       if (!sessionId) {
-        const response: AgentResponse = await startSymptomSession(clean, token, language);
+        const response: AgentResponse = await startSymptomSession(clean, token, chatLanguage);
         setSessionId(response.session_id);
         setConvoState('chatting');
         setQuestionCount(1);
@@ -287,6 +298,18 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
 
+  /* ─── Voice recording result → send as message ─── */
+  const onVoiceResult = useCallback((text: string) => {
+    setShowVoice(false);
+    sendMessage(text);
+  }, [sendMessage]);
+
+  /* ─── Language selection ─── */
+  const onLanguageSelect = useCallback((code: LanguageCode) => {
+    setChatLanguage(code);
+    setLanguage(code);
+  }, [setLanguage]);
+
   /* ─── Render chat bubble ─── */
   const renderBubble = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === 'user';
@@ -320,11 +343,30 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.welcomeSubtitle}>Your AI Health Assistant</Text>
           </View>
 
+          {/* Language selector */}
+          <View style={styles.langSection}>
+            <Text style={styles.langLabel}>{t('select_language')}</Text>
+            <View style={styles.langRow}>
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.code}
+                  style={[styles.langChip, chatLanguage === opt.code && styles.langChipActive]}
+                  onPress={() => onLanguageSelect(opt.code)}
+                >
+                  <Text style={styles.langFlag}>{opt.flag}</Text>
+                  <Text style={[styles.langText, chatLanguage === opt.code && styles.langTextActive]}>
+                    {opt.nativeLabel}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           {/* Greeting */}
           <View style={styles.greetingBox}>
-            <Text style={styles.greetingHi}>Hello 👋</Text>
-            <Text style={styles.greetingQ}>How are you feeling today?</Text>
-            <Text style={styles.greetingHint}>Tap a symptom below, or describe in your own words</Text>
+            <Text style={styles.greetingHi}>{t('greeting_hi')}</Text>
+            <Text style={styles.greetingQ}>{t('greeting_question')}</Text>
+            <Text style={styles.greetingHint}>{t('greeting_hint')}</Text>
           </View>
 
           {/* Quick illness grid */}
@@ -342,10 +384,23 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
             ))}
           </View>
 
+          {/* Voice recorder */}
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>or speak</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          <VoiceRecorder
+            onResult={onVoiceResult}
+            language={chatLanguage}
+            token={token}
+          />
+
           {/* Separator */}
           <View style={styles.orRow}>
             <View style={styles.orLine} />
-            <Text style={styles.orText}>or type below</Text>
+            <Text style={styles.orText}>{t('or_type_below')}</Text>
             <View style={styles.orLine} />
           </View>
         </ScrollView>
@@ -355,7 +410,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
           {isTyping && (
             <View style={styles.typingRow}>
               <ActivityIndicator size="small" color={PRIMARY} />
-              <Text style={styles.typingText}>Connecting to Health AI…</Text>
+              <Text style={styles.typingText}>{t('connecting')}</Text>
             </View>
           )}
           {error && (
@@ -369,7 +424,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
               style={styles.textInput}
               value={textDraft}
               onChangeText={setTextDraft}
-              placeholder="e.g. I have a headache since morning…"
+              placeholder={t('type_placeholder')}
               placeholderTextColor="#9CA3AF"
               multiline
               maxLength={500}
@@ -399,9 +454,9 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.analyzingRoot}>
         <View style={styles.analyzingCard}>
           <ActivityIndicator size="large" color={PRIMARY} style={{ marginBottom: 20 }} />
-          <Text style={styles.analyzingTitle}>Analyzing your health</Text>
+          <Text style={styles.analyzingTitle}>{t('analyzing_title')}</Text>
           <Text style={styles.analyzingSubtitle}>
-            Our AI is reviewing your symptoms and preparing a personalized assessment…
+            {t('analyzing_subtitle')}
           </Text>
           <View style={styles.analyzingDots}>
             {[0, 1, 2].map(i => (
@@ -473,7 +528,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
       {/* Answer option chips */}
       {!isTyping && currentOptions && currentOptions.length > 0 && (
         <View style={styles.optionsContainer}>
-          <Text style={styles.optionsHint}>Tap your answer 👇</Text>
+          <Text style={styles.optionsHint}>{t('tap_answer')}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -503,63 +558,82 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
       {/* Text input – shown when no options OR "Other" was tapped */}
       {!isTyping && showTextInput && (
         <View style={styles.bottomBar}>
-          <View style={styles.inputRow}>
-            {currentOptions && (
-              <Pressable style={styles.backBtn} onPress={() => setShowTextInput(false)}>
-                <Text style={styles.backBtnText}>← Options</Text>
+          {showVoice ? (
+            <VoiceRecorder onResult={onVoiceResult} language={chatLanguage} token={token} />
+          ) : (
+            <View style={styles.inputRow}>
+              {currentOptions && (
+                <Pressable style={styles.backBtn} onPress={() => setShowTextInput(false)}>
+                  <Text style={styles.backBtnText}>← Options</Text>
+                </Pressable>
+              )}
+              <Pressable style={styles.micBtnSmall} onPress={() => setShowVoice(true)}>
+                <Text style={styles.micBtnSmallIcon}>🎙️</Text>
               </Pressable>
-            )}
-            <TextInput
-              ref={inputRef}
-              style={styles.textInput}
-              value={textDraft}
-              onChangeText={setTextDraft}
-              placeholder="Type your answer…"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              maxLength={500}
-              editable={!isTyping}
-              returnKeyType="send"
-              onSubmitEditing={() => sendMessage(textDraft)}
-              blurOnSubmit={false}
-            />
-            <Pressable
-              style={[styles.sendBtn, (!textDraft.trim() || isTyping) && styles.sendBtnOff]}
-              onPress={() => sendMessage(textDraft)}
-              disabled={!textDraft.trim() || isTyping}
-            >
-              <Text style={styles.sendBtnIcon}>↑</Text>
-            </Pressable>
-          </View>
+              <TextInput
+                ref={inputRef}
+                style={styles.textInput}
+                value={textDraft}
+                onChangeText={setTextDraft}
+                placeholder={t('type_answer')}
+                placeholderTextColor="#9CA3AF"
+                multiline
+                maxLength={500}
+                editable={!isTyping}
+                returnKeyType="send"
+                onSubmitEditing={() => sendMessage(textDraft)}
+                blurOnSubmit={false}
+              />
+              <Pressable
+                style={[styles.sendBtn, (!textDraft.trim() || isTyping) && styles.sendBtnOff]}
+                onPress={() => sendMessage(textDraft)}
+                disabled={!textDraft.trim() || isTyping}
+              >
+                <Text style={styles.sendBtnIcon}>↑</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
 
       {/* Fallback: no options detected → always show text input */}
       {!isTyping && !currentOptions && !showTextInput && (
         <View style={styles.bottomBar}>
-          <View style={styles.inputRow}>
-            <TextInput
-              ref={inputRef}
-              style={styles.textInput}
-              value={textDraft}
-              onChangeText={setTextDraft}
-              placeholder="Type your answer…"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              maxLength={500}
-              editable={!isTyping}
-              returnKeyType="send"
-              onSubmitEditing={() => sendMessage(textDraft)}
-              blurOnSubmit={false}
-            />
-            <Pressable
-              style={[styles.sendBtn, (!textDraft.trim() || isTyping) && styles.sendBtnOff]}
-              onPress={() => sendMessage(textDraft)}
-              disabled={!textDraft.trim() || isTyping}
-            >
-              <Text style={styles.sendBtnIcon}>↑</Text>
+          {showVoice ? (
+            <VoiceRecorder onResult={onVoiceResult} language={chatLanguage} token={token} />
+          ) : (
+            <View style={styles.inputRow}>
+              <Pressable style={styles.micBtnSmall} onPress={() => setShowVoice(true)}>
+                <Text style={styles.micBtnSmallIcon}>🎙️</Text>
+              </Pressable>
+              <TextInput
+                ref={inputRef}
+                style={styles.textInput}
+                value={textDraft}
+                onChangeText={setTextDraft}
+                placeholder={t('type_answer')}
+                placeholderTextColor="#9CA3AF"
+                multiline
+                maxLength={500}
+                editable={!isTyping}
+                returnKeyType="send"
+                onSubmitEditing={() => sendMessage(textDraft)}
+                blurOnSubmit={false}
+              />
+              <Pressable
+                style={[styles.sendBtn, (!textDraft.trim() || isTyping) && styles.sendBtnOff]}
+                onPress={() => sendMessage(textDraft)}
+                disabled={!textDraft.trim() || isTyping}
+              >
+                <Text style={styles.sendBtnIcon}>↑</Text>
+              </Pressable>
+            </View>
+          )}
+          {showVoice && (
+            <Pressable style={styles.switchToText} onPress={() => setShowVoice(false)}>
+              <Text style={styles.switchToTextLabel}>⌨️ Type instead</Text>
             </Pressable>
-          </View>
+          )}
         </View>
       )}
     </KeyboardAvoidingView>
@@ -757,4 +831,38 @@ const styles = StyleSheet.create({
 
   backBtn: { paddingRight: 4 },
   backBtnText: { color: PRIMARY, fontSize: 13, fontWeight: '600' },
+
+  /* ── Language selector ── */
+  langSection: { paddingHorizontal: 24, paddingTop: 18, paddingBottom: 4 },
+  langLabel: { fontSize: 13, fontWeight: '700', color: SUBTLE, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
+  langRow: { flexDirection: 'row', gap: 10 },
+  langChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: WHITE,
+    borderRadius: 14,
+    paddingVertical: 12,
+    borderWidth: 2,
+    borderColor: BORDER,
+  },
+  langChipActive: { borderColor: PRIMARY, backgroundColor: '#EBF4FF' },
+  langFlag: { fontSize: 18 },
+  langText: { fontSize: 14, fontWeight: '600', color: TEXT },
+  langTextActive: { color: PRIMARY },
+
+  /* ── Mic button (chat input) ── */
+  micBtnSmall: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#EBF3FF',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: PRIMARY,
+  },
+  micBtnSmallIcon: { fontSize: 18 },
+
+  /* ── Switch to text link ── */
+  switchToText: { alignItems: 'center', paddingTop: 8, paddingBottom: 4 },
+  switchToTextLabel: { color: PRIMARY, fontSize: 14, fontWeight: '600' },
 });

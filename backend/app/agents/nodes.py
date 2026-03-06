@@ -62,7 +62,7 @@ RULES:
 def _get_model():
     """Get Gemini model instance with system prompt."""
     return genai.GenerativeModel(
-        "gemini-2.0-flash",
+        "gemini-2.5-flash",
         system_instruction=AGENT_SYSTEM_PROMPT,
     )
 

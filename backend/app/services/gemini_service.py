@@ -18,8 +18,8 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 
 def _get_model():
     """Get the Gemini generative model instance."""
-    # Using gemini-2.0-flash as the model name
-    return genai.GenerativeModel("gemini-2.0-flash")
+    # Using gemini-2.5-flash as the model name
+    return genai.GenerativeModel("gemini-2.5-flash")
 
 
 TRIAGE_PROMPT_TEMPLATE = """You are Swasthya Saathi, a medical triage AI assistant designed for rural healthcare in India.

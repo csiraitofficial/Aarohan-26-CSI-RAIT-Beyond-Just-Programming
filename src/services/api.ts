@@ -1,4 +1,29 @@
-const BASE_URL = 'http://192.168.137.110:8000';
+import { NativeModules } from 'react-native';
+
+// Dynamically resolve the backend URL based on the current Expo Metro host.
+// Evaluated lazily on each request so NativeModules are fully populated at call time.
+// Works on any network without needing to hardcode IP addresses.
+let _cachedBaseUrl: string | null = null;
+
+function getBaseUrl(): string {
+  // Return cached value if already successfully resolved to a real IP
+  if (_cachedBaseUrl && !_cachedBaseUrl.includes('localhost')) {
+    return _cachedBaseUrl;
+  }
+  // NativeModules.SourceCode.scriptURL contains the Metro bundler URL
+  // e.g. "http://192.168.x.x:8081/..." — extract host and replace port with 8000
+  try {
+    const scriptURL: string = NativeModules?.SourceCode?.scriptURL ?? '';
+    if (scriptURL) {
+      const match = scriptURL.match(/https?:\/\/([^:/]+)/);
+      if (match && match[1] && match[1] !== 'localhost') {
+        _cachedBaseUrl = `http://${match[1]}:8000`;
+        return _cachedBaseUrl;
+      }
+    }
+  } catch (_) {}
+  return 'http://localhost:8000';
+}
 
 // HTTPS check disabled for local development
 // if (!BASE_URL.startsWith('https://')) {
@@ -12,7 +37,7 @@ type RequestOptions = {
 };
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${getBaseUrl()}${path}`, {
     method: options.method ?? 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -159,4 +184,74 @@ export async function getConversationHistory(sessionId: string, token: string): 
   return apiRequest<ConversationHistory>(`/api/symptom-agent/${sessionId}/conversation`, {
     token,
   });
+}
+
+/* ─── Voice Transcription API ─── */
+
+export interface TranscriptionResult {
+  text: string;
+  language: string;
+  confidence: number | null;
+  status: string;
+}
+
+export interface SupportedLanguage {
+  code: string;
+  name: string;
+  bcp47_code: string;
+}
+
+/**
+ * Transcribe an audio file via AssemblyAI backend.
+ * Sends the file as multipart/form-data.
+ */
+export async function transcribeVoice(
+  audioUri: string,
+  language: string,
+  token: string,
+): Promise<TranscriptionResult> {
+  const formData = new FormData();
+
+  // Create file object for React Native FormData
+  const uriParts = audioUri.split('.');
+  const fileExtension = uriParts[uriParts.length - 1];
+  const mimeType = fileExtension === 'wav' ? 'audio/wav'
+    : fileExtension === 'webm' ? 'audio/webm'
+    : fileExtension === 'm4a' ? 'audio/m4a'
+    : 'audio/mpeg';
+
+  formData.append('audio', {
+    uri: audioUri,
+    name: `recording.${fileExtension}`,
+    type: mimeType,
+  } as any);
+  formData.append('language', language);
+
+  const response = await fetch(`${getBaseUrl()}/api/voice/transcribe`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // Do NOT set Content-Type — fetch sets it automatically with boundary for FormData
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Transcription failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.detail || errorMessage;
+    } catch {}
+
+    if (response.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    throw new Error(errorMessage);
+  }
+
+  return (await response.json()) as TranscriptionResult;
+}
+
+export async function getSupportedLanguages(token: string): Promise<SupportedLanguage[]> {
+  return apiRequest<SupportedLanguage[]>('/api/voice/languages', { token });
 }

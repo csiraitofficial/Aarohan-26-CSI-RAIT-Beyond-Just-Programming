@@ -1,19 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  useAudioRecorder,
+  useAudioRecorderState,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+} from 'expo-audio';
 import { theme } from '../../utils/theme';
+import { transcribeVoice } from '../../services/api';
 
 type Props = {
   onResult: (text: string) => void;
+  language?: string;
+  token?: string | null;
 };
 
-export const VoiceRecorder: React.FC<Props> = ({ onResult }) => {
-  const [recording, setRecording] = useState(false);
+export const VoiceRecorder: React.FC<Props> = ({ onResult, language = 'en', token }) => {
+  const [transcribing, setTranscribing] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const pulse = useRef(new Animated.Value(1)).current;
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // expo-audio hooks
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder, 300);
+  const isRecording = recorderState.isRecording;
+
   useEffect(() => {
-    if (recording) {
+    if (isRecording) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulse, { toValue: 1.15, duration: 500, useNativeDriver: true }),
@@ -26,37 +41,108 @@ export const VoiceRecorder: React.FC<Props> = ({ onResult }) => {
       pulse.setValue(1);
       if (timer.current) clearInterval(timer.current);
     }
-    return () => { if (timer.current) clearInterval(timer.current); };
-  }, [recording, pulse]);
+    return () => {
+      if (timer.current) clearInterval(timer.current);
+    };
+  }, [isRecording, pulse]);
 
-  const toggle = () => {
-    if (recording) {
-      setRecording(false);
-      // Simulate speech-to-text result
-      const sampleResults = [
-        'I have been having a fever and headache for two days',
-        'I feel chest pain when breathing deeply',
-        'My throat is sore and I have a cough',
-      ];
-      const text = sampleResults[Math.floor(Math.random() * sampleResults.length)];
-      setTimeout(() => onResult(text), 600);
+  const startRecording = async () => {
+    try {
+      setError(null);
+
+      // Request permissions using the top-level export
+      const permResult = await requestRecordingPermissionsAsync();
+      if (!permResult.granted) {
+        setError('Microphone permission is required');
+        return;
+      }
+
+      // Prepare and start recording
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setSeconds(0);
-    } else {
-      setRecording(true);
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+      setError('Could not start recording');
     }
   };
 
-  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  const stopRecording = async () => {
+    if (!isRecording) return;
+
+    setTranscribing(true);
+
+    try {
+      await recorder.stop();
+
+      // Get the URI from the recorder instance
+      const uri = recorder.uri;
+
+      if (!uri) {
+        setError('No recording found');
+        setTranscribing(false);
+        return;
+      }
+
+      if (!token) {
+        setError('Please log in to use voice input');
+        setTranscribing(false);
+        return;
+      }
+
+      // Send to backend for transcription
+      const result = await transcribeVoice(uri, language, token);
+      if (result.text && result.text.trim()) {
+        onResult(result.text.trim());
+      } else {
+        setError('Could not understand speech. Please try again.');
+      }
+    } catch (err) {
+      console.error('Transcription failed:', err);
+      const message = err instanceof Error ? err.message : 'Transcription failed';
+      setError(message);
+    } finally {
+      setTranscribing(false);
+      setSeconds(0);
+    }
+  };
+
+  const toggle = () => {
+    if (transcribing) return;
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const fmt = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  const hintText = transcribing
+    ? 'Transcribing…'
+    : isRecording
+      ? 'Listening…'
+      : 'Tap to speak';
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.hint}>{recording ? 'Listening…' : 'Tap to describe how you feel'}</Text>
+      <Text style={styles.hint}>{hintText}</Text>
       <Animated.View style={{ transform: [{ scale: pulse }] }}>
-        <Pressable style={[styles.mic, recording && styles.micActive]} onPress={toggle}>
-          <Text style={styles.micIcon}>{recording ? '⏹' : '🎙️'}</Text>
+        <Pressable
+          style={[styles.mic, isRecording && styles.micActive, transcribing && styles.micTranscribing]}
+          onPress={toggle}
+          disabled={transcribing}
+        >
+          <Text style={styles.micIcon}>{transcribing ? '⏳' : isRecording ? '⏹' : '🎙️'}</Text>
         </Pressable>
       </Animated.View>
-      {recording && <Text style={styles.timer}>{fmt(seconds)}</Text>}
+      {isRecording && <Text style={styles.timer}>{fmt(seconds)}</Text>}
+      {error && (
+        <Pressable onPress={() => setError(null)}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+        </Pressable>
+      )}
     </View>
   );
 };
@@ -69,6 +155,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: theme.colors.primary,
   },
   micActive: { backgroundColor: '#FEE2E2', borderColor: theme.colors.danger },
+  micTranscribing: { backgroundColor: '#FFF7ED', borderColor: '#F59E0B', opacity: 0.7 },
   micIcon: { fontSize: 32 },
   timer: { marginTop: 12, fontSize: 18, fontWeight: '700', color: theme.colors.textPrimary },
+  errorText: { marginTop: 10, color: '#DC2626', fontSize: 13, textAlign: 'center', maxWidth: 280 },
 });

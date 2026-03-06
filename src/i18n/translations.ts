@@ -1,4 +1,4 @@
-export type LanguageCode = 'en' | 'hi';
+export type LanguageCode = 'en' | 'hi' | 'ta';
 
 type TranslationMap = Record<LanguageCode, Record<string, string>>;
 
@@ -16,7 +16,22 @@ export const translations: TranslationMap = {
     patient: 'Patient',
     doctor: 'Doctor',
     chw: 'CHW',
-    admin: 'Admin'
+    admin: 'Admin',
+    // Symptom agent
+    greeting_hi: 'Hello 👋',
+    greeting_question: 'How are you feeling today?',
+    greeting_hint: 'Tap a symptom below, or describe in your own words',
+    or_type_below: 'or type below',
+    type_placeholder: 'e.g. I have a headache since morning…',
+    type_answer: 'Type your answer…',
+    tap_answer: 'Tap your answer 👇',
+    connecting: 'Connecting to Health AI…',
+    analyzing_title: 'Analyzing your health',
+    analyzing_subtitle: 'Our AI is reviewing your symptoms and preparing a personalized assessment…',
+    select_language: 'Select language',
+    voice_hint_idle: 'Tap to speak',
+    voice_hint_recording: 'Listening…',
+    voice_transcribing: 'Transcribing…',
   },
   hi: {
     tagline: 'सस्ती। सुलभ। एआई-संचालित स्वास्थ्य सेवा।',
@@ -31,6 +46,51 @@ export const translations: TranslationMap = {
     patient: 'मरीज',
     doctor: 'डॉक्टर',
     chw: 'सीएचडब्ल्यू',
-    admin: 'एडमिन'
-  }
+    admin: 'एडमिन',
+    // Symptom agent
+    greeting_hi: 'नमस्ते 👋',
+    greeting_question: 'आज आप कैसा महसूस कर रहे हैं?',
+    greeting_hint: 'नीचे कोई लक्षण चुनें, या अपने शब्दों में बताएं',
+    or_type_below: 'या नीचे लिखें',
+    type_placeholder: 'जैसे: मुझे सुबह से सिरदर्द है…',
+    type_answer: 'अपना जवाब लिखें…',
+    tap_answer: 'अपना जवाब चुनें 👇',
+    connecting: 'Health AI से जुड़ रहे हैं…',
+    analyzing_title: 'आपके स्वास्थ्य का विश्लेषण',
+    analyzing_subtitle: 'हमारा AI आपके लक्षणों की समीक्षा कर रहा है…',
+    select_language: 'भाषा चुनें',
+    voice_hint_idle: 'बोलने के लिए दबाएं',
+    voice_hint_recording: 'सुन रहे हैं…',
+    voice_transcribing: 'लिख रहे हैं…',
+  },
+  ta: {
+    tagline: 'மலிவான. அணுகக்கூடிய. AI-இயக்கப்படும் சுகாதாரம்.',
+    continue: 'தொடரவும்',
+    login: 'உள்நுழைய',
+    register: 'பதிவு செய்ய',
+    name: 'முழு பெயர்',
+    phone: 'தொலைபேசி எண்',
+    email: 'மின்னஞ்சல்',
+    password: 'கடவுச்சொல்',
+    chooseRole: 'உங்கள் பணியைத் தேர்வு செய்யவும்',
+    patient: 'நோயாளி',
+    doctor: 'மருத்துவர்',
+    chw: 'சுகாதார பணியாளர்',
+    admin: 'நிர்வாகி',
+    // Symptom agent
+    greeting_hi: 'வணக்கம் 👋',
+    greeting_question: 'இன்று நீங்கள் எப்படி உணர்கிறீர்கள்?',
+    greeting_hint: 'கீழே ஒரு அறிகுறியைத் தேர்ந்தெடுக்கவும், அல்லது உங்கள் வார்த்தைகளில் விவரிக்கவும்',
+    or_type_below: 'அல்லது கீழே தட்டச்சு செய்யவும்',
+    type_placeholder: 'எ.கா. காலை முதல் தலைவலி…',
+    type_answer: 'உங்கள் பதிலைத் தட்டச்சு செய்யவும்…',
+    tap_answer: 'உங்கள் பதிலைத் தேர்வு செய்யவும் 👇',
+    connecting: 'Health AI உடன் இணைகிறது…',
+    analyzing_title: 'உங்கள் ஆரோக்கியத்தை பகுப்பாய்வு செய்கிறது',
+    analyzing_subtitle: 'எங்கள் AI உங்கள் அறிகுறிகளை மதிப்பாய்வு செய்கிறது…',
+    select_language: 'மொழி தேர்வு',
+    voice_hint_idle: 'பேச அழுத்தவும்',
+    voice_hint_recording: 'கேட்கிறது…',
+    voice_transcribing: 'எழுதுகிறது…',
+  },
 };

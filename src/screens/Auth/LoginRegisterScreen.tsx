@@ -10,8 +10,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { theme } from '../../utils/theme';
 
-// ── TODO: remove this flag and restore real API auth once backend is ready ──
-const DEMO_MODE = true;
+// Real backend auth is active  — set to true only for offline UI testing
+const DEMO_MODE = false;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 
@@ -52,7 +52,10 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
         }
       }
     } catch (err: any) {
-      // Alert only relevant outside demo mode — left here for when real auth is restored
+      const msg = err?.message || 'Login failed. Please try again.';
+      // Use Alert to show authentication errors to the user
+      const { Alert } = require('react-native');
+      Alert.alert('Authentication Error', msg);
     } finally {
       setLoading(false);
     }
