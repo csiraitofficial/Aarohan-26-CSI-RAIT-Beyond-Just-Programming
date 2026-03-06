@@ -43,11 +43,11 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
       if (mode === 'register') {
         const response = await apiRegister({ full_name: fullName, phone, password });
         const role = (response.user.role as UserRole) || 'patient';
-        await login(role, response.access_token);
+        await login(role, response.access_token, response.user.id);
       } else {
         const response = await apiLogin({ phone, password });
         const role = (response.user.role as UserRole) || 'patient';
-        await login(role, response.access_token);
+        await login(role, response.access_token, response.user.id);
       }
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Authentication failed. Please try again.');

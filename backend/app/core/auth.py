@@ -19,7 +19,9 @@ from app.models.models import User
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 scheme for JWT bearer tokens
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# Note: tokenUrl is for Swagger UI auto-discovery; our actual login uses JSON body.
+# Using auto_error=True so missing tokens raise 401 automatically.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 
 def hash_password(password: str) -> str:

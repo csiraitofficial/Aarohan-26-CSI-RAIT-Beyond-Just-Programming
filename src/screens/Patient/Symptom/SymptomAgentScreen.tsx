@@ -102,7 +102,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
     addChat, clearChat, chatMessages, setClassification, resetEntry,
     addCase,
   } = usePatient();
-  const { token } = useAuth();
+  const { token, userId } = useAuth();
   const { language } = useLanguage();
 
   const [convoState, setConvoState] = useState<ConvoState>('initial');
@@ -165,7 +165,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
       // Build case record
       const caseRecord = {
         id: sid,
-        patientId: 'p1',
+        patientId: userId || 'unknown',
         date: new Date().toISOString().split('T')[0],
         symptomsText: result.primary_concern || '',
         symptoms: [] as string[],

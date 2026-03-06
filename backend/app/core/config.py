@@ -34,3 +34,24 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Startup safety checks
+import logging as _logging
+_logger = _logging.getLogger(__name__)
+
+if settings.SECRET_KEY == "dev-secret-key-change-in-production" and not settings.DEBUG:
+    raise RuntimeError(
+        "SECURITY ERROR: Default JWT SECRET_KEY detected in production mode. "
+        "Set a strong SECRET_KEY in your .env file."
+    )
+elif settings.SECRET_KEY == "dev-secret-key-change-in-production":
+    _logger.warning(
+        "⚠️  Using default SECRET_KEY — acceptable for development only. "
+        "Set a strong SECRET_KEY in .env before deploying."
+    )
+
+if settings.GEMINI_API_KEY == "your_gemini_api_key_here":
+    _logger.warning(
+        "⚠️  GEMINI_API_KEY not configured — AI triage will fall back to "
+        "rule-based analysis. Set GEMINI_API_KEY in .env for full AI features."
+    )
