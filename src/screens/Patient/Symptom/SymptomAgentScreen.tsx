@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../../navigation/types';
 import { usePatient } from '../../../context/PatientContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import { ChatMessage } from '../../../models';
 import {
   startSymptomSession,
@@ -102,6 +103,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
     addCase,
   } = usePatient();
   const { token } = useAuth();
+  const { language } = useLanguage();
 
   const [convoState, setConvoState] = useState<ConvoState>('initial');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -154,12 +156,8 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
         redFlagsDetected: result.triage_level === 'emergency',
         requiresDoctor: result.triage_level !== 'mild',
         guidance: result.primary_concern || 'Analysis complete',
-        homeRemedies: result.recommendations?.filter((r: string) =>
-          r.toLowerCase().includes('home') ||
-          r.toLowerCase().includes('rest') ||
-          r.toLowerCase().includes('water')
-        ) || [],
-        warningSignsToWatch: [] as string[],
+        homeRemedies: result.home_remedies || [],
+        warningSignsToWatch: result.warning_signs || [],
         escalationReason: result.triage_level === 'emergency' ? result.primary_concern : undefined,
       };
       setClassification(classification);
@@ -230,7 +228,7 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       if (!sessionId) {
-        const response: AgentResponse = await startSymptomSession(clean, token);
+        const response: AgentResponse = await startSymptomSession(clean, token, language);
         setSessionId(response.session_id);
         setConvoState('chatting');
         setQuestionCount(1);

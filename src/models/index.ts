@@ -1,6 +1,6 @@
 export type UserRole = 'patient' | 'doctor' | 'chw' | 'admin';
 
-export type RiskLevel = 'mild' | 'moderate' | 'emergency';
+export type RiskLevel = 'mild' | 'moderate' | 'emergency' | 'pending';
 
 /* ─── AI Classification ─── */
 export interface AIClassification {

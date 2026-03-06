@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardTypeOptions, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../../utils/theme';
 
 type InputFieldProps = {
@@ -7,6 +7,7 @@ type InputFieldProps = {
   value: string;
   onChangeText: (value: string) => void;
   secureTextEntry?: boolean;
+  keyboardType?: KeyboardTypeOptions;
   error?: string;
 };
 
@@ -15,6 +16,7 @@ export const InputField: React.FC<InputFieldProps> = ({
   value,
   onChangeText,
   secureTextEntry,
+  keyboardType,
   error
 }) => {
   return (
@@ -24,6 +26,7 @@ export const InputField: React.FC<InputFieldProps> = ({
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType}
         style={[styles.input, error ? styles.inputError : undefined]}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}

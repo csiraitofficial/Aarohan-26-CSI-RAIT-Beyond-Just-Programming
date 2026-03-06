@@ -48,7 +48,7 @@ class ConsultationDetail(BaseModel):
     triage_level: str
     primary_concern: Optional[str] = None
     ai_assessment: Optional[str] = None
-    recommendations: Optional[str] = None
+    recommendations: Optional[List[str]] = None
     urgency_score: Optional[int] = None
     follow_up_needed: bool = False
     follow_up_date: Optional[str] = None

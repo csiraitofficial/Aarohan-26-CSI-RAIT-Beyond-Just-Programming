@@ -98,6 +98,7 @@ export interface AgentResponse {
   turn_number: number;
   symptoms_identified: string[];
   is_emergency: boolean;
+  emergency_message?: string | null;
   progress_pct: number;
   question_type?: string;
   /** Medically-contextual answer options derived from the question tree. */
@@ -105,20 +106,23 @@ export interface AgentResponse {
 }
 
 export interface TriageResult {
+  session_id: string;
+  message?: string;
   triage_level: 'mild' | 'moderate' | 'emergency';
-  primary_concern: string;
-  recommendations: string[];
-  urgency_score: number;
-  symptoms_collected: number;
-  conversation_turns: number;
+  primary_concern: string | null;
+  recommendations: string[] | null;
+  warning_signs: string[] | null;
+  home_remedies: string[] | null;
+  urgency_score: number | null;
+  follow_up_needed: boolean;
+  follow_up_timeframe: string | null;
 }
 
 export interface ConversationTurn {
   turn_number: number;
   agent_question: string;
   patient_response: string | null;
-  question_type: string;
-  symptom_category: string | null;
+  question_type: string | null;
 }
 
 export interface ConversationHistory {
@@ -128,10 +132,10 @@ export interface ConversationHistory {
   symptoms_collected: number;
 }
 
-export async function startSymptomSession(message: string, token: string): Promise<AgentResponse> {
+export async function startSymptomSession(message: string, token: string, language: string = 'en'): Promise<AgentResponse> {
   return apiRequest<AgentResponse>('/api/symptom-agent/start', {
     method: 'POST',
-    body: { initial_message: message, language: 'en' },
+    body: { initial_message: message, language },
     token,
   });
 }

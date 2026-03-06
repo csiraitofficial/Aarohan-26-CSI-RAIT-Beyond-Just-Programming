@@ -9,72 +9,48 @@ import { UserRole } from '../../models';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { theme } from '../../utils/theme';
-import * as api from '../../services/api';
+import { login as apiLogin, register as apiRegister } from '../../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
-
-const roles: UserRole[] = ['patient', 'doctor', 'chw', 'admin'];
 
 export const LoginRegisterScreen: React.FC<Props> = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
 
-  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('patient');
+  const [fullName, setFullName] = useState('');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
-  const [touched, setTouched] = useState({ name: false, phone: false, email: false, password: false });
+  const [touched, setTouched] = useState({ phone: false, password: false, fullName: false });
 
   const errors = useMemo(() => {
     return {
-      name: mode === 'register' && name.length < 2 ? 'Please enter your full name.' : '',
       phone: phone.length >= 10 ? '' : 'Please enter a valid phone number.',
-      email: email && !email.includes('@') ? 'Please enter a valid email address.' : '',
-      password: password.length >= 6 ? '' : 'Password must be at least 6 characters.'
+      password: password.length >= 6 ? '' : 'Password must be at least 6 characters.',
+      fullName: fullName.length >= 2 ? '' : 'Please enter your full name.',
     };
-  }, [name, phone, email, password, mode]);
+  }, [phone, password, fullName]);
 
-  const canSubmit = 
-    phone.length >= 10 && 
-    password.length >= 6 && 
-    (mode === 'login' || name.length >= 2);
+  const canSubmit = phone.length >= 10 && password.length >= 6 && (mode === 'login' || fullName.length >= 2);
 
   const handleSubmit = async () => {
-    setTouched({ name: true, phone: true, email: true, password: true });
-    if (!canSubmit) {
-      return;
-    }
+    setTouched({ phone: true, password: true, fullName: true });
+    if (!canSubmit || loading) return;
 
     setLoading(true);
     try {
-      let response: api.AuthResponse;
-      
       if (mode === 'register') {
-        response = await api.register({
-          full_name: name,
-          phone: phone.startsWith('+') ? phone : `+91${phone}`,
-          email: email || undefined,
-          password,
-        });
-        Alert.alert('Success', 'Registration successful! You are now logged in.');
+        const response = await apiRegister({ full_name: fullName, phone, password });
+        const role = (response.user.role as UserRole) || 'patient';
+        await login(role, response.access_token);
       } else {
-        response = await api.login({
-          phone: phone.startsWith('+') ? phone : `+91${phone}`,
-          password,
-        });
+        const response = await apiLogin({ phone, password });
+        const role = (response.user.role as UserRole) || 'patient';
+        await login(role, response.access_token);
       }
-
-      // Store the real token from the API
-      await login(response.user.role as UserRole, response.access_token);
-    } catch (error) {
-      console.error('Auth error:', error);
-      Alert.alert(
-        'Authentication Failed',
-        error instanceof Error ? error.message : 'Please check your credentials and try again.'
-      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Authentication failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -83,6 +59,9 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
   return (
     <View style={styles.container}>
       <Card style={styles.card}>
+        <Text style={styles.title}>Swasthya Saathi</Text>
+        <Text style={styles.subtitle}>Your Health Companion</Text>
+
         <View style={styles.modeRow}>
           <Pressable onPress={() => setMode('login')}>
             <Text style={[styles.modeText, mode === 'login' && styles.modeActive]}>{t('login')}</Text>
@@ -94,32 +73,20 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
 
         {mode === 'register' && (
           <InputField
-            label={t('name') || 'Full Name'}
-            value={name}
-            onChangeText={(v) => { setName(v); setTouched((prev) => ({ ...prev, name: true })); }}
-            error={touched.name ? errors.name : ''}
+            label="Full Name"
+            value={fullName}
+            onChangeText={(v) => { setFullName(v); setTouched((prev) => ({ ...prev, fullName: true })); }}
+            error={touched.fullName ? errors.fullName : ''}
           />
         )}
 
         <InputField
-          label={t('phone') || 'Phone Number'}
+          label="Phone Number"
           value={phone}
           onChangeText={(v) => { setPhone(v); setTouched((prev) => ({ ...prev, phone: true })); }}
-          error={touched.phone ? errors.phone : ''}
-          placeholder="+919999999999 or 9999999999"
           keyboardType="phone-pad"
+          error={touched.phone ? errors.phone : ''}
         />
-
-        {mode === 'register' && (
-          <InputField
-            label={t('email') || 'Email (optional)'}
-            value={email}
-            onChangeText={(v) => { setEmail(v); setTouched((prev) => ({ ...prev, email: true })); }}
-            error={touched.email ? errors.email : ''}
-            keyboardType="email-address"
-          />
-        )}
-
         <InputField
           label={t('password')}
           value={password}
@@ -128,20 +95,8 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
           error={touched.password ? errors.password : ''}
         />
 
-        <Text style={styles.roleLabel}>{t('chooseRole')}</Text>
-        <View style={styles.roleRow}>
-          {roles.map((item) => {
-            const active = item === role;
-            return (
-              <Pressable key={item} onPress={() => setRole(item)} style={[styles.roleChip, active && styles.roleChipActive]}>
-                <Text style={[styles.roleChipText, active && styles.roleChipTextActive]}>{t(item)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <PrimaryButton 
-          title={mode === 'login' ? t('login') : t('register')} 
+        <PrimaryButton
+          title={loading ? 'Please wait...' : mode === 'login' ? t('login') : t('register')}
           onPress={handleSubmit}
           disabled={loading}
         />
@@ -155,52 +110,40 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: theme.spacing.lg,
-    backgroundColor: theme.colors.background
+    backgroundColor: theme.colors.background,
   },
   card: {
-    marginBottom: 0
+    marginBottom: 0,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   modeRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
-    marginBottom: theme.spacing.md
+    gap: 24,
+    marginBottom: theme.spacing.md,
   },
   modeText: {
     fontSize: 16,
+    fontWeight: '500',
     color: theme.colors.textSecondary,
-    fontWeight: '700'
+    paddingBottom: 4,
   },
   modeActive: {
-    color: theme.colors.primary
+    color: theme.colors.primary,
+    fontWeight: '700',
+    borderBottomWidth: 2,
+    borderBottomColor: theme.colors.primary,
   },
-  roleLabel: {
-    color: theme.colors.textSecondary,
-    marginBottom: 10
-  },
-  roleRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: theme.spacing.md
-  },
-  roleChip: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFF'
-  },
-  roleChipActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: '#E8F1FF'
-  },
-  roleChipText: {
-    color: theme.colors.textSecondary,
-    fontWeight: '600'
-  },
-  roleChipTextActive: {
-    color: theme.colors.primary
-  }
 });

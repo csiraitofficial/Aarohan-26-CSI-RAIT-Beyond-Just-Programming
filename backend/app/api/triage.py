@@ -215,7 +215,7 @@ def _build_consultation_detail(session: ConsultationSession) -> ConsultationDeta
         triage_level=session.triage_level.value,
         primary_concern=session.primary_concern,
         ai_assessment=session.ai_assessment,
-        recommendations=session.recommendations,
+        recommendations=json.loads(session.recommendations) if session.recommendations else None,
         urgency_score=session.urgency_score,
         follow_up_needed=session.follow_up_needed,
         follow_up_date=session.follow_up_date,
