@@ -17,6 +17,7 @@ import { CaseDetailScreen } from '../screens/Patient/CaseDetailScreen';
 import { RemindersScreen } from '../screens/Patient/RemindersScreen';
 import { ProfileScreen } from '../screens/Patient/ProfileScreen';
 import { EmergencyScreen } from '../screens/Patient/EmergencyScreen';
+import { VideoCallScreen } from '../screens/Shared/VideoCallScreen';
 
 import { theme } from '../utils/theme';
 import { LogoutButton } from '../components/ui/LogoutButton';
@@ -44,6 +45,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="CaseDetailScreen" component={CaseDetailScreen} options={{ title: 'Case Details' }} />
       <HomeStack.Screen name="RemindersScreen" component={RemindersScreen} options={{ title: 'Reminders' }} />
       <HomeStack.Screen name="EmergencyScreen" component={EmergencyScreen} options={{ title: '🚨 Emergency', headerStyle: { backgroundColor: '#FEE2E2' } }} />
+      <HomeStack.Screen name="VideoCallScreen" component={VideoCallScreen} options={{ headerShown: false, animation: 'fade' }} />
     </HomeStack.Navigator>
   );
 }
@@ -60,6 +62,7 @@ function SymptomsStackScreen() {
       {/* Legacy */}
       <SymptomsStack.Screen name="SymptomScreen" component={SymptomScreen} options={{ title: 'Check Symptoms' }} />
       <SymptomsStack.Screen name="AISubmitScreen" component={AISubmitScreen} options={{ title: 'AI Result' }} />
+      <SymptomsStack.Screen name="VideoCallScreen" component={VideoCallScreen} options={{ headerShown: false, animation: 'fade' }} />
     </SymptomsStack.Navigator>
   );
 }

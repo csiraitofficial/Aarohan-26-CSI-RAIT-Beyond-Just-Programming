@@ -1,9 +1,4 @@
-const BASE_URL = 'http://192.168.137.110:8000';
-
-// HTTPS check disabled for local development
-// if (!BASE_URL.startsWith('https://')) {
-//   throw new Error('HTTPS is required for all API traffic.');
-// }
+const BASE_URL = 'http://192.168.137.174:8000';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -66,6 +61,7 @@ export interface RegisterData {
   phone: string;
   email?: string;
   password: string;
+  role?: string;
   gender?: string;
   date_of_birth?: string;
 }
@@ -157,6 +153,35 @@ export async function completeSymptomSession(sessionId: string, token: string): 
 
 export async function getConversationHistory(sessionId: string, token: string): Promise<ConversationHistory> {
   return apiRequest<ConversationHistory>(`/api/symptom-agent/${sessionId}/conversation`, {
+    token,
+  });
+}
+
+/* ─── Video Call API ─── */
+
+export interface VideoRoomResponse {
+  room_url: string;
+  room_name: string;
+  consultation_id: string | null;
+}
+
+export async function createVideoRoom(token: string, consultationId?: string): Promise<VideoRoomResponse> {
+  return apiRequest<VideoRoomResponse>('/api/video/create-room', {
+    method: 'POST',
+    body: { consultation_id: consultationId ?? null },
+    token,
+  });
+}
+
+export async function joinVideoRoom(consultationId: string, token: string): Promise<VideoRoomResponse> {
+  return apiRequest<VideoRoomResponse>(`/api/video/join/${encodeURIComponent(consultationId)}`, {
+    token,
+  });
+}
+
+export async function endVideoRoom(consultationId: string, token: string): Promise<{ detail: string }> {
+  return apiRequest<{ detail: string }>(`/api/video/end-room/${encodeURIComponent(consultationId)}`, {
+    method: 'DELETE',
     token,
   });
 }

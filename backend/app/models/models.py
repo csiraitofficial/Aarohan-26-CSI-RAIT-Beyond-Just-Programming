@@ -126,6 +126,8 @@ class ConsultationSession(Base):
     # Conversation agent state
     conversation_state = Column(String(30), default="not_started")  # not_started, collecting, clarifying, complete
     conversation_context = Column(Text, nullable=True)  # JSON: accumulated context for AI
+    video_room_url = Column(String(500), nullable=True)  # Daily.co room URL for video calls
+    video_room_name = Column(String(200), nullable=True)  # Daily.co room name
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 

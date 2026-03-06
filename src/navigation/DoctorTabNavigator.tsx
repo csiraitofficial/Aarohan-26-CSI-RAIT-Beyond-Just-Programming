@@ -8,6 +8,7 @@ import { PatientHealthDetailsScreen } from '../screens/Doctor/PatientHealthDetai
 import { LiveConsultationScreen } from '../screens/Doctor/LiveConsultationScreen';
 import { EPrescriptionScreen } from '../screens/Doctor/EPrescriptionScreen';
 import { DoctorNotificationsScreen } from '../screens/Doctor/DoctorNotificationsScreen';
+import { VideoCallScreen } from '../screens/Shared/VideoCallScreen';
 
 import { theme } from '../utils/theme';
 import { LogoutButton } from '../components/ui/LogoutButton';
@@ -27,6 +28,7 @@ export type DoctorStackParamList = {
   LiveConsultationScreen: { patientId?: string };
   EPrescriptionScreen: { patientId?: string };
   DoctorNotificationsScreen: undefined;
+  VideoCallScreen: { roomUrl: string; patientName?: string; consultationId?: string };
 };
 
 const TabIcon = ({ emoji }: { emoji: string }) => (
@@ -73,6 +75,11 @@ function ConsultStackScreen() {
         name="LiveConsultationScreen"
         component={LiveConsultationScreen}
         options={{ headerShown: false }}
+      />
+      <ConsultStack.Screen
+        name="VideoCallScreen"
+        component={VideoCallScreen}
+        options={{ headerShown: false, animation: 'fade' }}
       />
     </ConsultStack.Navigator>
   );

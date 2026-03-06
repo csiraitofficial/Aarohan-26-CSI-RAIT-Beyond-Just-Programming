@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../../navigation/types';
 import { Card } from '../../../components/ui/Card';
@@ -7,15 +7,19 @@ import { RiskBadge } from '../../../components/ui/RiskBadge';
 import { PrimaryButton } from '../../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../../components/ui/SecondaryButton';
 import { usePatient } from '../../../context/PatientContext';
+import { useAuth } from '../../../context/AuthContext';
 import { theme } from '../../../utils/theme';
 import { NATURAL_REMEDIES, NaturalRemedy } from '../../../data/naturalRemedies';
 import { MEDICATION_SUGGESTIONS, MedicationSuggestion } from '../../../data/medications';
 import { MOCK_DOCTORS, Doctor } from '../../../data/doctors';
+import { joinVideoRoom } from '../../../services/api';
 
 type Props = NativeStackScreenProps<PatientStackParamList, 'DoctorNeededDashboard'>;
 
 export const DoctorNeededDashboard: React.FC<Props> = ({ navigation }) => {
   const { caseHistory, latestClassification } = usePatient();
+  const { token } = useAuth();
+  const [joiningCall, setJoiningCall] = useState(false);
   const latest = caseHistory.length > 0 ? caseHistory[0] : null;
   const cls = latestClassification ?? latest?.classification;
 
@@ -193,6 +197,29 @@ export const DoctorNeededDashboard: React.FC<Props> = ({ navigation }) => {
       {/* ── Actions ── */}
       <View style={styles.actions}>
         <PrimaryButton title="🩺 Select a Doctor" onPress={() => navigation.navigate('DoctorSelectionScreen' as any)} />
+        <View style={styles.spacer} />
+        <PrimaryButton
+          title={joiningCall ? '⏳ Connecting...' : '📹 Join Video Call'}
+          onPress={async () => {
+            if (!token || !latest?.id) {
+              Alert.alert('Info', 'No active consultation found. Please complete a symptom check first.');
+              return;
+            }
+            setJoiningCall(true);
+            try {
+              const room = await joinVideoRoom(latest.id, token);
+              navigation.navigate('VideoCallScreen', {
+                roomUrl: room.room_url,
+                patientName: undefined,
+                consultationId: room.consultation_id ?? undefined,
+              });
+            } catch {
+              Alert.alert('No Video Call', 'The doctor has not started a video call yet. Please wait for the doctor to initiate the call.');
+            } finally {
+              setJoiningCall(false);
+            }
+          }}
+        />
         <View style={styles.spacer} />
         <SecondaryButton title="💾 Save to Records" onPress={() => navigation.navigate('RecordsScreen')} />
         <View style={styles.spacer} />
