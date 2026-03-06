@@ -28,6 +28,8 @@ export type PatientStackParamList = {
   RemindersScreen: undefined;
   ProfileScreen: undefined;
   EmergencyScreen: undefined;
+  /* Video Call */
+  VideoCallScreen: { roomUrl: string; patientName?: string; consultationId?: string };
 };
 
 /* Bottom-tab param list */
@@ -55,4 +57,6 @@ export type DoctorStackParamList = {
   LiveConsultationScreen: { patientId?: string };
   EPrescriptionScreen: { patientId?: string };
   DoctorNotificationsScreen: undefined;
+  /* Video Call */
+  VideoCallScreen: { roomUrl: string; patientName?: string; consultationId?: string };
 };

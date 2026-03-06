@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../utils/theme';
+import { useAuth } from '../../context/AuthContext';
+import { createVideoRoom } from '../../services/api';
+import { DoctorStackParamList } from '../../navigation/DoctorTabNavigator';
 
 /* ─── Types ─── */
 interface ChatMsg {
@@ -51,7 +57,30 @@ export const LiveConsultationScreen: React.FC = () => {
   const [messages, setMessages] = useState<ChatMsg[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isStartingCall, setIsStartingCall] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const navigation = useNavigation<NativeStackNavigationProp<DoctorStackParamList>>();
+  const { token } = useAuth();
+
+  const handleStartVideoCall = async () => {
+    if (!token) {
+      Alert.alert('Error', 'You must be logged in to start a video call.');
+      return;
+    }
+    setIsStartingCall(true);
+    try {
+      const room = await createVideoRoom(token);
+      navigation.navigate('VideoCallScreen', {
+        roomUrl: room.room_url,
+        patientName: ACTIVE_PATIENT.name,
+        consultationId: room.consultation_id ?? undefined,
+      });
+    } catch (err: any) {
+      Alert.alert('Video Call Error', err.message || 'Failed to create video room.');
+    } finally {
+      setIsStartingCall(false);
+    }
+  };
 
   const sendMessage = (text: string) => {
     if (!text.trim()) return;
@@ -101,8 +130,8 @@ export const LiveConsultationScreen: React.FC = () => {
           <Pressable style={styles.barActionBtn}>
             <Text style={{ fontSize: 18 }}>📞</Text>
           </Pressable>
-          <Pressable style={styles.barActionBtn}>
-            <Text style={{ fontSize: 18 }}>📹</Text>
+          <Pressable style={styles.barActionBtn} onPress={handleStartVideoCall} disabled={isStartingCall}>
+            <Text style={{ fontSize: 18 }}>{isStartingCall ? '⏳' : '📹'}</Text>
           </Pressable>
           <Pressable style={[styles.barActionBtn, { backgroundColor: '#FEF2F2' }]}>
             <Text style={{ fontSize: 16 }}>🔚</Text>
@@ -114,7 +143,6 @@ export const LiveConsultationScreen: React.FC = () => {
       <View style={styles.miniVitalsBar}>
         <MiniVital label="HR" value={`${ACTIVE_PATIENT.vitals.hr}`} unit="bpm" alert={ACTIVE_PATIENT.vitals.hr > 100} />
         <MiniVital label="BP" value={ACTIVE_PATIENT.vitals.bp} unit="" alert={true} />
-        <MiniVital label="SpO₂" value={`${ACTIVE_PATIENT.vitals.spo2}%`} unit="" alert={ACTIVE_PATIENT.vitals.spo2 < 92} />
         <MiniVital label="Temp" value={`${ACTIVE_PATIENT.vitals.temp}°F`} unit="" alert={false} />
         <View style={styles.symptomMini}>
           {ACTIVE_PATIENT.symptoms.slice(0, 2).map((s, i) => (

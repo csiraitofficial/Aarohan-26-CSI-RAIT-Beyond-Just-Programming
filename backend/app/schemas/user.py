@@ -12,6 +12,7 @@ class UserCreate(BaseModel):
     phone: str = Field(..., min_length=10, max_length=20, examples=["+919876543210"])
     email: Optional[str] = Field(None, examples=["rajesh@example.com"])
     password: str = Field(..., min_length=6, max_length=128, examples=["securepassword123"])
+    role: Optional[str] = Field("PATIENT", examples=["PATIENT", "DOCTOR", "CHW"])
     date_of_birth: Optional[str] = Field(None, examples=["1990-05-15"])
     gender: Optional[str] = Field(None, examples=["male"])
     language_preference: Optional[str] = Field("en", examples=["hi"])

@@ -225,14 +225,6 @@ export const PatientHealthDetailsScreen: React.FC = () => {
           trend="up"
         />
         <VitalStripItem
-          icon="🫁"
-          label="SpO₂"
-          value={`${PATIENT.vitals.spo2}`}
-          unit="%"
-          alert={PATIENT.vitals.spo2 < 92}
-          trend="down"
-        />
-        <VitalStripItem
           icon="🌡️"
           label="Temp"
           value={`${PATIENT.vitals.temperature}`}
@@ -358,14 +350,6 @@ export const PatientHealthDetailsScreen: React.FC = () => {
                 unit="mmHg"
                 normal="120/80"
                 status="critical"
-              />
-              <VitalDetailCard
-                icon="🫁"
-                label="Oxygen Sat."
-                value={`${PATIENT.vitals.spo2}`}
-                unit="%"
-                normal="95-100"
-                status={PATIENT.vitals.spo2 < 92 ? 'critical' : 'warning'}
               />
               <VitalDetailCard
                 icon="🌡️"

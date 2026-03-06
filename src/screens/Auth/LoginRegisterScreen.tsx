@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { Card } from '../../components/ui/Card';
@@ -10,8 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { theme } from '../../utils/theme';
 
-// ── TODO: remove this flag and restore real API auth once backend is ready ──
-const DEMO_MODE = true;
+// Real API auth — connects to FastAPI backend backed by Supabase PostgreSQL
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 
@@ -35,24 +34,23 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
 
   const handleSubmit = async () => {
     if (loading) return;
+
+    if (!phone.trim()) { Alert.alert('Missing field', 'Please enter your phone number.'); return; }
+    if (!password.trim()) { Alert.alert('Missing field', 'Please enter your password.'); return; }
+    if (mode === 'register' && !fullName.trim()) { Alert.alert('Missing field', 'Please enter your full name.'); return; }
+
     setLoading(true);
     try {
-      if (DEMO_MODE) {
-        // ── Demo mode: skip API, log in with any input ──
-        await login(role, 'demo-token', 'demo-user-001');
+      const { login: apiLogin, register: apiRegister } = await import('../../services/api');
+      if (mode === 'register') {
+        const res = await apiRegister({ full_name: fullName, phone: phone.trim(), password, role: role.toUpperCase() as any });
+        await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
       } else {
-        // ── Real auth (restore when backend is ready) ──
-        const { login: apiLogin, register: apiRegister } = await import('../../services/api');
-        if (mode === 'register') {
-          const res = await apiRegister({ full_name: fullName, phone, password });
-          await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
-        } else {
-          const res = await apiLogin({ phone, password });
-          await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
-        }
+        const res = await apiLogin({ phone: phone.trim(), password });
+        await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
       }
     } catch (err: any) {
-      // Alert only relevant outside demo mode — left here for when real auth is restored
+      Alert.alert('Error', err?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -63,11 +61,6 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
       <Card style={styles.card}>
         <Text style={styles.title}>Swasthya Saathi</Text>
         <Text style={styles.subtitle}>Your Health Companion</Text>
-
-        {/* Demo badge */}
-        <View style={styles.demoBadge}>
-          <Text style={styles.demoBadgeText}>🚧 Demo Mode — any input works</Text>
-        </View>
 
         {/* Login / Register tabs */}
         <View style={styles.modeRow}>
@@ -156,21 +149,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
-  },
-  demoBadge: {
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  demoBadgeText: {
-    fontSize: 12,
-    color: '#92400E',
-    fontWeight: '600',
   },
   modeRow: {
     flexDirection: 'row',
