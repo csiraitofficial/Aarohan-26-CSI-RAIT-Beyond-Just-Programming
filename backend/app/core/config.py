@@ -3,8 +3,12 @@ Core configuration module for Swasthya Saathi backend.
 Loads environment variables and provides app-wide settings.
 """
 
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
+
+# Resolve the .env path relative to this file (backend/.env)
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -27,7 +31,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     model_config = {
-        "env_file": ".env",
+        "env_file": str(_ENV_FILE),
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
     }

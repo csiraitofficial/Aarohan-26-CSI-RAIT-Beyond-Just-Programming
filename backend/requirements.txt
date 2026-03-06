@@ -14,3 +14,12 @@ pytest==8.3.3
 pytest-asyncio==0.24.0
 slowapi==0.1.9
 bcrypt==4.0.1
+
+# LangGraph AI Agent Pipeline
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-google-genai>=2.0.0
+
+# DistilBERT Emergency Classifier
+transformers>=4.40.0
+torch>=2.2.0
