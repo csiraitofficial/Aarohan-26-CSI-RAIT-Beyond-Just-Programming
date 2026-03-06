@@ -28,13 +28,15 @@ const RISK_COLOR: Record<RiskLevel, string> = {
   mild:      theme.colors.mild,
   moderate:  theme.colors.moderate,
   emergency: theme.colors.emergency,
+  pending:   theme.colors.textSecondary,
 };
 const RISK_BG: Record<RiskLevel, string> = {
   mild:      '#F0FDF4',
   moderate:  '#FFFBEB',
   emergency: '#FEF2F2',
+  pending:   '#F3F4F6',
 };
-const RISK_SCORE: Record<RiskLevel, number> = { mild: 1, moderate: 2, emergency: 3 };
+const RISK_SCORE: Record<RiskLevel, number> = { mild: 1, moderate: 2, emergency: 3, pending: 0 };
 
 const SCREEN_W = Dimensions.get('window').width;
 const CHART_W  = SCREEN_W - theme.spacing.lg * 2 - 32;
@@ -191,7 +193,7 @@ export const RecordsScreen: React.FC<Props> = ({ navigation }) => {
   const [filter, setFilter] = useState<RiskLevel | 'all'>('all');
 
   const counts = useMemo(() => {
-    const c = { mild: 0, moderate: 0, emergency: 0 };
+    const c: Record<RiskLevel, number> = { mild: 0, moderate: 0, emergency: 0, pending: 0 };
     caseHistory.forEach((r) => { c[r.result.risk]++; });
     return c;
   }, [caseHistory]);
