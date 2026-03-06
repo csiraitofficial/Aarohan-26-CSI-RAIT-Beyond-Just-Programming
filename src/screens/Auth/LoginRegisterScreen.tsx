@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { Card } from '../../components/ui/Card';
@@ -9,6 +9,7 @@ import { UserRole } from '../../models';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { theme } from '../../utils/theme';
+import * as api from '../../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 
@@ -18,27 +19,65 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
 
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('patient');
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [touched, setTouched] = useState({ email: false, password: false });
+  const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState({ name: false, phone: false, email: false, password: false });
 
   const errors = useMemo(() => {
     return {
-      email: email.includes('@') ? '' : 'Please enter a valid email address.',
+      name: mode === 'register' && name.length < 2 ? 'Please enter your full name.' : '',
+      phone: phone.length >= 10 ? '' : 'Please enter a valid phone number.',
+      email: email && !email.includes('@') ? 'Please enter a valid email address.' : '',
       password: password.length >= 6 ? '' : 'Password must be at least 6 characters.'
     };
-  }, [email, password]);
+  }, [name, phone, email, password, mode]);
 
-  const canSubmit = email.includes('@') && password.length >= 6;
+  const canSubmit = 
+    phone.length >= 10 && 
+    password.length >= 6 && 
+    (mode === 'login' || name.length >= 2);
 
   const handleSubmit = async () => {
-    setTouched({ email: true, password: true });
+    setTouched({ name: true, phone: true, email: true, password: true });
     if (!canSubmit) {
       return;
     }
-    await login(role);
+
+    setLoading(true);
+    try {
+      let response: api.AuthResponse;
+      
+      if (mode === 'register') {
+        response = await api.register({
+          full_name: name,
+          phone: phone.startsWith('+') ? phone : `+91${phone}`,
+          email: email || undefined,
+          password,
+        });
+        Alert.alert('Success', 'Registration successful! You are now logged in.');
+      } else {
+        response = await api.login({
+          phone: phone.startsWith('+') ? phone : `+91${phone}`,
+          password,
+        });
+      }
+
+      // Store the real token from the API
+      await login(response.user.role as UserRole, response.access_token);
+    } catch (error) {
+      console.error('Auth error:', error);
+      Alert.alert(
+        'Authentication Failed',
+        error instanceof Error ? error.message : 'Please check your credentials and try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,12 +92,34 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
           </Pressable>
         </View>
 
+        {mode === 'register' && (
+          <InputField
+            label={t('name') || 'Full Name'}
+            value={name}
+            onChangeText={(v) => { setName(v); setTouched((prev) => ({ ...prev, name: true })); }}
+            error={touched.name ? errors.name : ''}
+          />
+        )}
+
         <InputField
-          label={t('email')}
-          value={email}
-          onChangeText={(v) => { setEmail(v); setTouched((prev) => ({ ...prev, email: true })); }}
-          error={touched.email ? errors.email : ''}
+          label={t('phone') || 'Phone Number'}
+          value={phone}
+          onChangeText={(v) => { setPhone(v); setTouched((prev) => ({ ...prev, phone: true })); }}
+          error={touched.phone ? errors.phone : ''}
+          placeholder="+919999999999 or 9999999999"
+          keyboardType="phone-pad"
         />
+
+        {mode === 'register' && (
+          <InputField
+            label={t('email') || 'Email (optional)'}
+            value={email}
+            onChangeText={(v) => { setEmail(v); setTouched((prev) => ({ ...prev, email: true })); }}
+            error={touched.email ? errors.email : ''}
+            keyboardType="email-address"
+          />
+        )}
+
         <InputField
           label={t('password')}
           value={password}
@@ -79,7 +140,11 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
           })}
         </View>
 
-        <PrimaryButton title={mode === 'login' ? t('login') : t('register')} onPress={handleSubmit} />
+        <PrimaryButton 
+          title={mode === 'login' ? t('login') : t('register')} 
+          onPress={handleSubmit}
+          disabled={loading}
+        />
       </Card>
     </View>
   );

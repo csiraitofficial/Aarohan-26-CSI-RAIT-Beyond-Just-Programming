@@ -1,1 +1,47 @@
-node_modules
+﻿# ===== Node / React Native =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# ===== Python / Backend =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+*.egg-info/
+*.egg
+.eggs/
+*.db
+*.sqlite3
+.pytest_cache/
+
+# ===== Environment / Secrets =====
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ===== OS files =====
+.DS_Store
+Thumbs.db
+*.swp
+*~
+*.bak
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.code-workspace
+
+# ===== Build & Test =====
+build/
+coverage/
+*.log

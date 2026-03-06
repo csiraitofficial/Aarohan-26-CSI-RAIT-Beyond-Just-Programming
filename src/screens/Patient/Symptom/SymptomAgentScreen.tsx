@@ -1,9 +1,11 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,477 +13,750 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../../navigation/types';
-import { Card } from '../../../components/ui/Card';
-import { VoiceRecorder } from '../../../components/ui/VoiceRecorder';
-import { Loader } from '../../../components/ui/Loader';
 import { usePatient } from '../../../context/PatientContext';
-import { classifySymptoms } from '../../../services/aiService';
-import { ChatMessage, SymptomEntry, VitalsData } from '../../../models';
-import { theme } from '../../../utils/theme';
+import { useAuth } from '../../../context/AuthContext';
+import { ChatMessage } from '../../../models';
+import {
+  startSymptomSession,
+  respondToAgent,
+  completeSymptomSession,
+  AgentResponse,
+  TriageResult,
+} from '../../../services/api';
 
 type Props = NativeStackScreenProps<PatientStackParamList, 'SymptomAgentScreen'>;
+type ConvoState = 'initial' | 'chatting' | 'analyzing' | 'complete';
 
-/* ─── Symptom chips ─── */
-const CHIPS = [
-  'Fever', 'Cough', 'Headache', 'Chest pain',
-  'Shortness of breath', 'Vomiting', 'Diarrhea', 'Dizziness',
+const MAX_QUESTIONS = 6;
+
+/* ─── Quick illness chips shown on welcome screen ─── */
+const QUICK_SYMPTOMS = [
+  { label: 'Headache',     emoji: '🤕' },
+  { label: 'Fever',        emoji: '🌡️' },
+  { label: 'Cough',        emoji: '😷' },
+  { label: 'Cold / Runny Nose', emoji: '🤧' },
+  { label: 'Stomach Ache', emoji: '🤢' },
+  { label: 'Vomiting',     emoji: '🤮' },
+  { label: 'Body Pain',    emoji: '💪' },
+  { label: 'Chest Pain',   emoji: '❤️' },
+  { label: 'Sore Throat',  emoji: '🗣️' },
+  { label: 'Diarrhea',     emoji: '🚽' },
+  { label: 'Dizziness',    emoji: '😵' },
+  { label: 'Weakness',     emoji: '😴' },
 ];
-const DURATIONS = ['1 day', '2–3 days', '1 week', 'More than 1 week'];
 
-/* ─── Conversation phases ─── */
-type Phase = 'input' | 'details' | 'vitals' | 'analyzing' | 'done';
+/**
+ * Return answer-chip options for an AI question.
+ *
+ * PRIMARY SOURCE: `backendOptions` — the backend extracts medically-accurate,
+ * question-specific options from the curated symptom questionnaires
+ * (e.g. headache locations = "front of head, back of head, one side, …"
+ *  vs. chest pain locations = "center, left side, right side, …").
+ *
+ * FALLBACK: minimal text-based detection for safety (numbered lists,
+ * parenthetical options in the AI message text).
+ *
+ * NO hardcoded option lists on the frontend — all medical knowledge
+ * lives in the backend questionnaire data.
+ *
+ * Returns null  → render a free-text input
+ * Returns array → render tappable answer chips
+ */
+function extractOptions(
+  text: string,
+  backendOptions?: string[] | null,
+): string[] | null {
+  // ── 1. Backend-provided options (source of truth) ──────────────────────
+  if (backendOptions && backendOptions.length > 0) {
+    return backendOptions;
+  }
+
+  // ── 2. Numbered list in the AI message text ────────────────────────────
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const numbered = lines.filter(l => /^\d+[\.\)]\s+.+/.test(l));
+  if (numbered.length >= 2) {
+    return numbered.map(l => l.replace(/^\d+[\.\)]\s+/, '').trim());
+  }
+
+  // ── 3. Parenthetical option list in the AI message text ────────────────
+  //    e.g. "(option A, option B, option C)"
+  const parenMatches = text.match(/\(([^)]{8,})\)/g);
+  if (parenMatches) {
+    for (let i = parenMatches.length - 1; i >= 0; i--) {
+      const inner = parenMatches[i].slice(1, -1);   // strip ( )
+      if (inner.includes(',')) {
+        const opts = inner.split(',').map(o => o.trim()).filter(Boolean);
+        if (opts.length >= 2) {
+          return opts.map(o => o.charAt(0).toUpperCase() + o.slice(1));
+        }
+      }
+    }
+  }
+
+  return null;   // default → free-text input
+}
 
 export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
   const {
-    currentEntry, updateEntry, resetEntry,
-    addCase, addChat, clearChat, chatMessages, setClassification,
-    latestClassification, profile,
+    addChat, clearChat, chatMessages, setClassification, resetEntry,
+    addCase,
   } = usePatient();
+  const { token } = useAuth();
 
-  const [phase, setPhase] = useState<Phase>('input');
-  const [mode, setMode] = useState<'voice' | 'manual' | null>(null);
+  const [convoState, setConvoState] = useState<ConvoState>('initial');
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [textDraft, setTextDraft] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [currentOptions, setCurrentOptions] = useState<string[] | null>(null);
+  const [showTextInput, setShowTextInput] = useState(false);
+
   const flatRef = useRef<FlatList>(null);
+  const inputRef = useRef<TextInput>(null);
 
-  /* ─── Chat helpers ─── */
+  /* ─── Clear chat on mount ─── */
+  useEffect(() => {
+    clearChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ─── Message helpers ─── */
   const pushUser = useCallback((text: string) => {
-    const msg: ChatMessage = { id: Date.now().toString(), role: 'user', text, timestamp: Date.now() };
+    const msg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text, timestamp: Date.now() };
     addChat(msg);
   }, [addChat]);
 
-  const pushAI = useCallback((text: string) => {
-    const msg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'ai', text, timestamp: Date.now() };
+  const pushAI = useCallback((text: string, backendOptions?: string[] | null) => {
+    const msg: ChatMessage = { id: `ai-${Date.now()}-${Math.random()}`, role: 'ai', text, timestamp: Date.now() };
     addChat(msg);
+    // Use backend-provided options as primary source of truth
+    const opts = extractOptions(text, backendOptions);
+    setCurrentOptions(opts);
+    setShowTextInput(opts === null);
   }, [addChat]);
 
-  /* ─── Phase: input complete → move to details ─── */
-  const confirmSymptoms = useCallback(() => {
-    const allSymptoms = [
-      ...currentEntry.symptoms,
-      ...currentEntry.rawText.split(',').map((s: string) => s.trim()).filter(Boolean),
-    ];
-    if (allSymptoms.length === 0 && currentEntry.rawText.trim().length === 0) return;
-
-    const symptomText = allSymptoms.length > 0 ? allSymptoms.join(', ') : currentEntry.rawText;
-    pushUser(symptomText);
-    pushAI('Got it. I need a few more details for an accurate analysis.\n\nHow long have you had these symptoms?');
-    setPhase('details');
-  }, [currentEntry, pushUser, pushAI]);
-
-  /* ─── Phase: details complete → move to vitals ─── */
-  const confirmDetails = useCallback(() => {
-    if (currentEntry.severity <= 0) {
-      updateEntry({ severity: 5 });
-    }
-    pushUser(`Duration: ${currentEntry.duration || 'Not specified'} • Severity: ${currentEntry.severity}/10${currentEntry.chronicIllness ? ' • Chronic illness' : ''}${currentEntry.pregnant ? ' • Pregnant' : ''}`);
-    pushAI('Thank you. If you have any vital measurements (temperature, BP, SpO₂), enter them now. Otherwise, skip to analyze.');
-    setPhase('vitals');
-  }, [currentEntry, pushUser, pushAI, updateEntry]);
-
-  /* ─── Phase: submit → AI classify ─── */
-  const handleAnalyze = useCallback(async () => {
-    if (submitted) return;
-    setSubmitted(true);
-    setSubmitting(true);
-    setPhase('analyzing');
-
-    const vitals = currentEntry.vitals;
-    const vitalsText = [
-      vitals.temperature ? `Temp: ${vitals.temperature}°F` : '',
-      vitals.bloodPressure ? `BP: ${vitals.bloodPressure}` : '',
-      vitals.oxygenSaturation ? `SpO₂: ${vitals.oxygenSaturation}%` : '',
-    ].filter(Boolean).join(' • ') || 'No vitals provided';
-    pushUser(vitalsText);
-    pushAI('Analyzing your health condition…');
+  /* ─── Handle completion & routing ─── */
+  const handleComplete = useCallback(async (sid: string) => {
+    setConvoState('analyzing');
+    setIsTyping(true);
+    setCurrentOptions(null);
+    setShowTextInput(false);
 
     try {
-      const entry: SymptomEntry = {
-        ...currentEntry,
-        age: profile.age,
-        medicalHistory: profile.medicalHistory,
-        allergies: profile.allergies,
-      };
-      const result = await classifySymptoms(entry);
-      setClassification(result);
+      const result: TriageResult = await completeSymptomSession(sid, token!);
 
-      /* build case record */
-      const allSymptoms = [
-        ...currentEntry.symptoms,
-        ...currentEntry.rawText.split(',').map((s: string) => s.trim()).filter(Boolean),
-      ];
+      // Map to AIClassification for context compatibility
+      const classification = {
+        riskLevel: result.triage_level,
+        confidenceScore: (result.urgency_score || 5) / 10,
+        recommendedAction: result.recommendations?.[0] || 'Consult a doctor',
+        redFlagsDetected: result.triage_level === 'emergency',
+        requiresDoctor: result.triage_level !== 'mild',
+        guidance: result.primary_concern || 'Analysis complete',
+        homeRemedies: result.recommendations?.filter((r: string) =>
+          r.toLowerCase().includes('home') ||
+          r.toLowerCase().includes('rest') ||
+          r.toLowerCase().includes('water')
+        ) || [],
+        warningSignsToWatch: [] as string[],
+        escalationReason: result.triage_level === 'emergency' ? result.primary_concern : undefined,
+      };
+      setClassification(classification);
+
+      // Build case record
       const caseRecord = {
-        id: Date.now().toString(),
+        id: sid,
         patientId: 'p1',
         date: new Date().toISOString().split('T')[0],
-        symptomsText: allSymptoms.join(', ') || currentEntry.rawText,
-        symptoms: allSymptoms,
-        severity: currentEntry.severity,
-        duration: currentEntry.duration,
-        vitals: currentEntry.vitals,
-        classification: result,
+        symptomsText: result.primary_concern || '',
+        symptoms: [] as string[],
+        severity: result.urgency_score || 5,
+        duration: '',
+        vitals: { temperature: '', bloodPressure: '', oxygenSaturation: '' },
+        classification,
         result: {
-          risk: result.riskLevel,
-          guidance: result.guidance,
-          nextAction: result.recommendedAction,
-          homeRemedies: result.homeRemedies,
+          risk: result.triage_level,
+          guidance: result.primary_concern || '',
+          nextAction: result.recommendations?.[0] || '',
+          homeRemedies: classification.homeRemedies,
         },
-        status: result.riskLevel === 'emergency'
+        status: result.triage_level === 'emergency'
           ? 'emergency_active' as const
-          : result.riskLevel === 'moderate'
+          : result.triage_level === 'moderate'
             ? 'doctor_assigned' as const
             : 'active' as const,
         createdAt: Date.now(),
       };
       addCase(caseRecord);
 
-      pushAI(`Analysis complete.\n\nRisk: ${result.riskLevel.toUpperCase()}\nConfidence: ${(result.confidenceScore * 100).toFixed(0)}%\n\n${result.guidance}`);
-      setPhase('done');
+      setConvoState('complete');
+      setIsTyping(false);
 
-      /* immediate routing for emergency */
-      if (result.riskLevel === 'emergency') {
-        setTimeout(() => {
-          resetEntry();
-          navigation.replace('EmergencyDashboard', { classificationId: caseRecord.id });
-        }, 1500);
-      }
+      setTimeout(() => {
+        resetEntry();
+        clearChat();
+        if (result.triage_level === 'emergency') {
+          navigation.replace('EmergencyDashboard', { classificationId: sid });
+        } else if (result.triage_level === 'moderate') {
+          navigation.replace('DoctorNeededDashboard');
+        } else {
+          navigation.replace('MildCaseDashboard');
+        }
+      }, 1800);
     } catch {
-      pushAI('Something went wrong. Please try again.');
-      setSubmitted(false);
-      setPhase('vitals');
-    } finally {
-      setSubmitting(false);
+      setIsTyping(false);
+      setError('Failed to complete analysis. Please try again.');
+      setConvoState('chatting');
+      pushAI('I had trouble completing the analysis. Please try again.');
     }
-  }, [currentEntry, profile, pushUser, pushAI, addCase, setClassification, resetEntry, navigation, submitted]);
+  }, [token, pushAI, setClassification, addCase, resetEntry, clearChat, navigation]);
 
-  /* ─── Navigate to result dashboard ─── */
-  const goToResult = useCallback(() => {
-    resetEntry();
-    clearChat();
-  }, [resetEntry, clearChat]);
+  /* ─── Core send (accepts text param — used by chips + text input) ─── */
+  const sendMessage = useCallback(async (text: string) => {
+    const clean = text.trim();
+    if (!clean || isTyping) return;
+    if (!token) {
+      setError('Please log in to continue.');
+      return;
+    }
 
-  /* ─── Chip toggle ─── */
-  const toggleChip = (chip: string) => {
-    const lower = chip.toLowerCase();
-    const arr = currentEntry.symptoms.includes(lower)
-      ? currentEntry.symptoms.filter((s: string) => s !== lower)
-      : [...currentEntry.symptoms, lower];
-    updateEntry({ symptoms: arr });
-  };
-
-  /* ─── Send manual text ─── */
-  const sendText = () => {
-    if (!textDraft.trim()) return;
-    updateEntry({ rawText: currentEntry.rawText ? `${currentEntry.rawText}, ${textDraft.trim()}` : textDraft.trim() });
     setTextDraft('');
-  };
+    setError(null);
+    setCurrentOptions(null);
+    setShowTextInput(false);
+    pushUser(clean);
+    setIsTyping(true);
+
+    try {
+      if (!sessionId) {
+        const response: AgentResponse = await startSymptomSession(clean, token);
+        setSessionId(response.session_id);
+        setConvoState('chatting');
+        setQuestionCount(1);
+
+        if (response.is_emergency) {
+          pushAI('🚨 ' + response.agent_message);
+          setIsTyping(false);
+          await handleComplete(response.session_id);
+          return;
+        }
+        pushAI(response.agent_message, response.options);
+        if (response.conversation_state === 'complete') {
+          setIsTyping(false);
+          await handleComplete(response.session_id);
+        }
+      } else {
+        const response: AgentResponse = await respondToAgent(sessionId, clean, token);
+        const newCount = questionCount + 1;
+        setQuestionCount(newCount);
+
+        if (response.is_emergency) {
+          pushAI('🚨 ' + response.agent_message);
+          setIsTyping(false);
+          await handleComplete(sessionId);
+          return;
+        }
+        pushAI(response.agent_message, response.options);
+        if (response.conversation_state === 'complete' || newCount >= MAX_QUESTIONS) {
+          setIsTyping(false);
+          await handleComplete(sessionId);
+        }
+      }
+    } catch (err) {
+      console.error('Symptom agent error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      pushAI('Sorry, something went wrong. Please try again.');
+    } finally {
+      setIsTyping(false);
+    }
+  }, [isTyping, token, sessionId, questionCount, pushUser, pushAI, handleComplete]);
+
+  /* ─── Quick illness chip tap (welcome screen) ─── */
+  const onQuickSymptom = useCallback((label: string) => {
+    sendMessage(`I have ${label}`);
+  }, [sendMessage]);
+
+  /* ─── Answer option chip tap ─── */
+  const onOptionTap = useCallback((option: string) => {
+    sendMessage(option);
+  }, [sendMessage]);
+
+  /* ─── "Other" chip tap → reveal text input ─── */
+  const onOtherTap = useCallback(() => {
+    setShowTextInput(true);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
 
   /* ─── Render chat bubble ─── */
   const renderBubble = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === 'user';
     return (
-      <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>
-        {!isUser && <Text style={styles.aiLabel}>🤖 Health AI</Text>}
-        <Text style={[styles.bubbleText, isUser && styles.userText]}>{item.text}</Text>
+      <View style={[styles.bubbleWrap, isUser ? styles.bubbleWrapRight : styles.bubbleWrapLeft]}>
+        {!isUser && (
+          <View style={styles.aiAvatar}>
+            <Text style={styles.aiAvatarText}>+</Text>
+          </View>
+        )}
+        <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>
+          <Text style={[styles.bubbleText, isUser && styles.userBubbleText]}>{item.text}</Text>
+        </View>
       </View>
     );
   };
 
-  /* ─── MAIN RENDER ─── */
-  return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.flex}>
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>🤖 Health AI Assistant</Text>
-          <Text style={styles.headerSub}>Describe your symptoms. I will analyze and guide you.</Text>
-        </View>
-
-        {/* ── Chat messages ── */}
-        <FlatList
-          ref={flatRef}
-          data={chatMessages}
-          renderItem={renderBubble}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.chatContent}
-          onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
-          ListEmptyComponent={
-            phase === 'input' ? (
-              <View style={styles.emptyChat}>
-                <Text style={styles.emptyChatIcon}>🩺</Text>
-                <Text style={styles.emptyChatText}>How are you feeling today?{'\n'}Choose voice or manual entry below.</Text>
-              </View>
-            ) : null
-          }
-        />
-
-        {/* ── Phase: input ── */}
-        {phase === 'input' && (
-          <View style={styles.inputArea}>
-            {/* mode selection */}
-            {!mode && (
-              <View style={styles.modeRow}>
-                <Pressable style={styles.modeBtn} onPress={() => setMode('voice')}>
-                  <Text style={styles.modeBtnIcon}>🎤</Text>
-                  <Text style={styles.modeBtnTxt}>Voice Input</Text>
-                </Pressable>
-                <Pressable style={styles.modeBtn} onPress={() => setMode('manual')}>
-                  <Text style={styles.modeBtnIcon}>✍️</Text>
-                  <Text style={styles.modeBtnTxt}>Manual Entry</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {/* voice */}
-            {mode === 'voice' && (
-              <VoiceRecorder onResult={(text: string) => {
-                updateEntry({ rawText: text });
-                setMode('manual'); // show editable view after recording
-              }} />
-            )}
-
-            {/* manual / post-voice */}
-            {mode === 'manual' && (
-              <>
-                {currentEntry.rawText ? (
-                  <Card>
-                    <Text style={styles.fieldLabel}>Your Description</Text>
-                    <TextInput
-                      style={styles.textArea}
-                      multiline
-                      value={currentEntry.rawText}
-                      onChangeText={(t) => updateEntry({ rawText: t })}
-                      placeholder="Edit or add more details…"
-                    />
-                  </Card>
-                ) : (
-                  <View style={styles.manualInputRow}>
-                    <TextInput
-                      style={styles.chatInput}
-                      value={textDraft}
-                      onChangeText={setTextDraft}
-                      placeholder="Describe how you feel…"
-                      multiline
-                    />
-                    <Pressable style={styles.sendBtn} onPress={sendText}>
-                      <Text style={styles.sendBtnTxt}>↑</Text>
-                    </Pressable>
-                  </View>
-                )}
-              </>
-            )}
-
-            {/* chips */}
-            {mode && (
-              <>
-                <Text style={styles.chipLabel}>Quick add symptoms:</Text>
-                <View style={styles.chipRow}>
-                  {CHIPS.map((c) => {
-                    const sel = currentEntry.symptoms.includes(c.toLowerCase());
-                    return (
-                      <Pressable key={c} style={[styles.chip, sel && styles.chipSel]} onPress={() => toggleChip(c)}>
-                        <Text style={[styles.chipTxt, sel && styles.chipTxtSel]}>{c}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <Pressable style={styles.primaryBtn} onPress={confirmSymptoms}>
-                  <Text style={styles.primaryBtnTxt}>Continue →</Text>
-                </Pressable>
-                <Pressable style={styles.switchMode} onPress={() => setMode(mode === 'voice' ? 'manual' : 'voice')}>
-                  <Text style={styles.switchTxt}>{mode === 'voice' ? '✍️ Switch to Manual' : '🎤 Switch to Voice'}</Text>
-                </Pressable>
-              </>
-            )}
+  /* ══════════════════════════════════════
+     WELCOME SCREEN
+  ══════════════════════════════════════ */
+  if (convoState === 'initial') {
+    return (
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.welcomeScroll} keyboardShouldPersistTaps="handled">
+          {/* Branding header */}
+          <View style={styles.welcomeHeader}>
+            <View style={styles.logoCircle}>
+              <Text style={styles.logoText}>+</Text>
+            </View>
+            <Text style={styles.welcomeTitle}>SwasthyaSaathi</Text>
+            <Text style={styles.welcomeSubtitle}>Your AI Health Assistant</Text>
           </View>
-        )}
 
-        {/* ── Phase: details ── */}
-        {phase === 'details' && (
-          <View style={styles.inputArea}>
-            <Text style={styles.fieldLabel}>Duration</Text>
-            <View style={styles.chipRow}>
-              {DURATIONS.map((d) => {
-                const active = currentEntry.duration === d;
-                return (
-                  <Pressable key={d} style={[styles.chip, active && styles.chipSel]} onPress={() => updateEntry({ duration: d })}>
-                    <Text style={[styles.chipTxt, active && styles.chipTxtSel]}>{d}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+          {/* Greeting */}
+          <View style={styles.greetingBox}>
+            <Text style={styles.greetingHi}>Hello 👋</Text>
+            <Text style={styles.greetingQ}>How are you feeling today?</Text>
+            <Text style={styles.greetingHint}>Tap a symptom below, or describe in your own words</Text>
+          </View>
 
-            <Text style={styles.fieldLabel}>Severity ({currentEntry.severity}/10)</Text>
-            <View style={styles.severityRow}>
-              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
-                <Pressable
-                  key={n}
-                  style={[styles.sevDot, currentEntry.severity >= n && styles.sevDotActive]}
-                  onPress={() => updateEntry({ severity: n })}
-                >
-                  <Text style={[styles.sevNum, currentEntry.severity >= n && styles.sevNumActive]}>{n}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={styles.toggleRow}>
+          {/* Quick illness grid */}
+          <View style={styles.chipGrid}>
+            {QUICK_SYMPTOMS.map((s) => (
               <Pressable
-                style={[styles.toggleBtn, currentEntry.chronicIllness && styles.toggleActive]}
-                onPress={() => updateEntry({ chronicIllness: !currentEntry.chronicIllness })}
+                key={s.label}
+                style={({ pressed }) => [styles.symptomChip, pressed && styles.chipPressed]}
+                onPress={() => onQuickSymptom(s.label)}
+                disabled={isTyping}
               >
-                <Text style={[styles.toggleTxt, currentEntry.chronicIllness && styles.toggleTxtActive]}>Chronic Illness</Text>
+                <Text style={styles.symptomEmoji}>{s.emoji}</Text>
+                <Text style={styles.symptomLabel}>{s.label}</Text>
               </Pressable>
-              {profile.gender === 'Female' && (
-                <Pressable
-                  style={[styles.toggleBtn, currentEntry.pregnant && styles.toggleActive]}
-                  onPress={() => updateEntry({ pregnant: !currentEntry.pregnant })}
-                >
-                  <Text style={[styles.toggleTxt, currentEntry.pregnant && styles.toggleTxtActive]}>Pregnant</Text>
-                </Pressable>
-              )}
-            </View>
+            ))}
+          </View>
 
-            <Pressable style={styles.primaryBtn} onPress={confirmDetails}>
-              <Text style={styles.primaryBtnTxt}>Continue →</Text>
+          {/* Separator */}
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>or type below</Text>
+            <View style={styles.orLine} />
+          </View>
+        </ScrollView>
+
+        {/* Input bar */}
+        <View style={styles.bottomBar}>
+          {isTyping && (
+            <View style={styles.typingRow}>
+              <ActivityIndicator size="small" color={PRIMARY} />
+              <Text style={styles.typingText}>Connecting to Health AI…</Text>
+            </View>
+          )}
+          {error && (
+            <Pressable onPress={() => setError(null)}>
+              <Text style={styles.errorTextSmall}>⚠️ {error}  (tap to dismiss)</Text>
+            </Pressable>
+          )}
+          <View style={styles.inputRow}>
+            <TextInput
+              ref={inputRef}
+              style={styles.textInput}
+              value={textDraft}
+              onChangeText={setTextDraft}
+              placeholder="e.g. I have a headache since morning…"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              maxLength={500}
+              editable={!isTyping}
+              returnKeyType="send"
+              onSubmitEditing={() => sendMessage(textDraft)}
+              blurOnSubmit={false}
+            />
+            <Pressable
+              style={[styles.sendBtn, (!textDraft.trim() || isTyping) && styles.sendBtnOff]}
+              onPress={() => sendMessage(textDraft)}
+              disabled={!textDraft.trim() || isTyping}
+            >
+              <Text style={styles.sendBtnIcon}>↑</Text>
             </Pressable>
           </View>
-        )}
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
 
-        {/* ── Phase: vitals ── */}
-        {phase === 'vitals' && (
-          <View style={styles.inputArea}>
-            <View style={styles.vitalRow}>
-              <Text style={styles.vitalLabel}>🌡️ Temp (°F)</Text>
-              <TextInput
-                style={styles.vitalInput}
-                keyboardType="numeric"
-                value={currentEntry.vitals.temperature}
-                onChangeText={(t) => updateEntry({ vitals: { ...currentEntry.vitals, temperature: t } })}
-                placeholder="98.6"
-              />
-            </View>
-            {Number(currentEntry.vitals.temperature) > 103 && (
-              <Text style={styles.warning}>⚠️ High temperature detected!</Text>
-            )}
-
-            <View style={styles.vitalRow}>
-              <Text style={styles.vitalLabel}>💉 BP (mmHg)</Text>
-              <TextInput
-                style={styles.vitalInput}
-                value={currentEntry.vitals.bloodPressure}
-                onChangeText={(t) => updateEntry({ vitals: { ...currentEntry.vitals, bloodPressure: t } })}
-                placeholder="120/80"
-              />
-            </View>
-
-            <View style={styles.vitalRow}>
-              <Text style={styles.vitalLabel}>💨 SpO₂ (%)</Text>
-              <TextInput
-                style={styles.vitalInput}
-                keyboardType="numeric"
-                value={currentEntry.vitals.oxygenSaturation}
-                onChangeText={(t) => updateEntry({ vitals: { ...currentEntry.vitals, oxygenSaturation: t } })}
-                placeholder="97"
-              />
-            </View>
-            {Number(currentEntry.vitals.oxygenSaturation) > 0 && Number(currentEntry.vitals.oxygenSaturation) < 90 && (
-              <Text style={styles.warning}>⚠️ Critical oxygen level detected!</Text>
-            )}
-
-            <Text style={styles.hintText}>Leave blank if you don't have a measurement device.</Text>
-
-            <Pressable style={styles.primaryBtn} onPress={handleAnalyze}>
-              <Text style={styles.primaryBtnTxt}>🔍 Analyze Symptoms</Text>
-            </Pressable>
-            <Pressable style={styles.skipBtn} onPress={handleAnalyze}>
-              <Text style={styles.skipTxt}>Skip vitals & analyze</Text>
-            </Pressable>
+  /* ══════════════════════════════════════
+     ANALYZING / COMPLETE SCREEN
+  ══════════════════════════════════════ */
+  if (convoState === 'analyzing' || convoState === 'complete') {
+    return (
+      <View style={styles.analyzingRoot}>
+        <View style={styles.analyzingCard}>
+          <ActivityIndicator size="large" color={PRIMARY} style={{ marginBottom: 20 }} />
+          <Text style={styles.analyzingTitle}>Analyzing your health</Text>
+          <Text style={styles.analyzingSubtitle}>
+            Our AI is reviewing your symptoms and preparing a personalized assessment…
+          </Text>
+          <View style={styles.analyzingDots}>
+            {[0, 1, 2].map(i => (
+              <View key={i} style={styles.analyzingDot} />
+            ))}
           </View>
-        )}
-
-        {/* ── Phase: analyzing ── */}
-        {phase === 'analyzing' && submitting && (
-          <View style={styles.loadingArea}>
-            <Loader message="Analyzing your health condition…" />
-          </View>
-        )}
-
-        {/* ── Phase: done ── */}
-        {phase === 'done' && (
-          <View style={styles.inputArea}>
-            <Pressable style={styles.primaryBtn} onPress={() => {
-              const cls = latestClassification;
-              resetEntry();
-              clearChat();
-              if (!cls || cls.riskLevel === 'mild') {
-                navigation.replace('MildCaseDashboard');
-              } else if (cls.riskLevel === 'moderate') {
-                navigation.replace('DoctorNeededDashboard');
-              }
-              // emergency already auto-routed
-            }}>
-              <Text style={styles.primaryBtnTxt}>View Full Result →</Text>
-            </Pressable>
-          </View>
-        )}
+        </View>
       </View>
+    );
+  }
+
+  /* ══════════════════════════════════════
+     CHAT SCREEN
+  ══════════════════════════════════════ */
+  return (
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Header */}
+      <View style={styles.chatHeader}>
+        <View style={styles.chatHeaderLeft}>
+          <View style={styles.logoCircleSmall}>
+            <Text style={styles.logoTextSmall}>+</Text>
+          </View>
+          <View>
+            <Text style={styles.chatHeaderTitle}>Health AI</Text>
+            <Text style={styles.chatHeaderSub}>
+              {isTyping ? 'typing…' : `Step ${questionCount} of ${MAX_QUESTIONS}`}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.progressDots}>
+          {Array.from({ length: MAX_QUESTIONS }).map((_, i) => (
+            <View key={i} style={[styles.dot, i < questionCount ? styles.dotFilled : styles.dotEmpty]} />
+          ))}
+        </View>
+      </View>
+
+      {/* Messages */}
+      <FlatList
+        ref={flatRef}
+        data={chatMessages}
+        renderItem={renderBubble}
+        keyExtractor={(m) => m.id}
+        contentContainerStyle={styles.chatList}
+        onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
+      />
+
+      {/* Typing bubble */}
+      {isTyping && (
+        <View style={styles.typingBubble}>
+          <View style={styles.aiAvatar}>
+            <Text style={styles.aiAvatarText}>+</Text>
+          </View>
+          <View style={styles.typingDotsBox}>
+            <Text style={styles.typingDotsText}>● ● ●</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Error banner */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+          <Pressable onPress={() => setError(null)}>
+            <Text style={styles.errorBannerClose}>✕</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Answer option chips */}
+      {!isTyping && currentOptions && currentOptions.length > 0 && (
+        <View style={styles.optionsContainer}>
+          <Text style={styles.optionsHint}>Tap your answer 👇</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.optionsScroll}
+          >
+            {currentOptions.map((opt) => (
+              <Pressable
+                key={opt}
+                style={({ pressed }) => [styles.optionChip, pressed && styles.optionChipPressed]}
+                onPress={() => onOptionTap(opt)}
+              >
+                <Text style={styles.optionChipText}>{opt}</Text>
+              </Pressable>
+            ))}
+            {!showTextInput && (
+              <Pressable
+                style={({ pressed }) => [styles.optionChipOther, pressed && styles.optionChipPressed]}
+                onPress={onOtherTap}
+              >
+                <Text style={styles.optionChipOtherText}>✏️  Other…</Text>
+              </Pressable>
+            )}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Text input – shown when no options OR "Other" was tapped */}
+      {!isTyping && showTextInput && (
+        <View style={styles.bottomBar}>
+          <View style={styles.inputRow}>
+            {currentOptions && (
+              <Pressable style={styles.backBtn} onPress={() => setShowTextInput(false)}>
+                <Text style={styles.backBtnText}>← Options</Text>
+              </Pressable>
+            )}
+            <TextInput
+              ref={inputRef}
+              style={styles.textInput}
+              value={textDraft}
+              onChangeText={setTextDraft}
+              placeholder="Type your answer…"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              maxLength={500}
+              editable={!isTyping}
+              returnKeyType="send"
+              onSubmitEditing={() => sendMessage(textDraft)}
+              blurOnSubmit={false}
+            />
+            <Pressable
+              style={[styles.sendBtn, (!textDraft.trim() || isTyping) && styles.sendBtnOff]}
+              onPress={() => sendMessage(textDraft)}
+              disabled={!textDraft.trim() || isTyping}
+            >
+              <Text style={styles.sendBtnIcon}>↑</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Fallback: no options detected → always show text input */}
+      {!isTyping && !currentOptions && !showTextInput && (
+        <View style={styles.bottomBar}>
+          <View style={styles.inputRow}>
+            <TextInput
+              ref={inputRef}
+              style={styles.textInput}
+              value={textDraft}
+              onChangeText={setTextDraft}
+              placeholder="Type your answer…"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              maxLength={500}
+              editable={!isTyping}
+              returnKeyType="send"
+              onSubmitEditing={() => sendMessage(textDraft)}
+              blurOnSubmit={false}
+            />
+            <Pressable
+              style={[styles.sendBtn, (!textDraft.trim() || isTyping) && styles.sendBtnOff]}
+              onPress={() => sendMessage(textDraft)}
+              disabled={!textDraft.trim() || isTyping}
+            >
+              <Text style={styles.sendBtnIcon}>↑</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
 
+/* ════════════════════════════════════════════
+   STYLES
+════════════════════════════════════════════ */
+const PRIMARY = '#0A84FF';
+const BG = '#F6F8FB';
+const WHITE = '#FFFFFF';
+const TEXT = '#111827';
+const SUBTLE = '#6B7280';
+const BORDER = '#E5E7EB';
+
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: theme.colors.background },
-  header: { backgroundColor: '#FFF', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.textPrimary },
-  headerSub: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 4 },
-  chatContent: { paddingHorizontal: 16, paddingVertical: 12, flexGrow: 1 },
-  emptyChat: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
-  emptyChatIcon: { fontSize: 48, marginBottom: 12 },
-  emptyChatText: { color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22 },
-  bubble: { maxWidth: '82%', borderRadius: 16, padding: 14, marginBottom: 10 },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: theme.colors.primary, borderBottomRightRadius: 4 },
-  aiBubble: { alignSelf: 'flex-start', backgroundColor: '#FFF', borderBottomLeftRadius: 4, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  aiLabel: { fontSize: 11, fontWeight: '700', color: theme.colors.primary, marginBottom: 4 },
-  bubbleText: { fontSize: 15, lineHeight: 22, color: theme.colors.textPrimary },
-  userText: { color: '#FFF' },
-  inputArea: { backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingHorizontal: 16, paddingVertical: 14 },
-  modeRow: { flexDirection: 'row', gap: 12 },
-  modeBtn: { flex: 1, backgroundColor: '#F6F8FB', borderRadius: 14, paddingVertical: 20, alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB' },
-  modeBtnIcon: { fontSize: 28, marginBottom: 6 },
-  modeBtnTxt: { fontWeight: '700', color: theme.colors.textPrimary },
-  manualInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  chatInput: { flex: 1, minHeight: 44, maxHeight: 100, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F9FAFB', fontSize: 15 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },
-  sendBtnTxt: { color: '#FFF', fontSize: 20, fontWeight: '700' },
-  fieldLabel: { fontSize: 14, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, marginTop: 10 },
-  textArea: { minHeight: 70, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, backgroundColor: '#F9FAFB', fontSize: 15, textAlignVertical: 'top' },
-  chipLabel: { fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginTop: 12, marginBottom: 6 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#FFF' },
-  chipSel: { backgroundColor: '#EBF3FF', borderColor: theme.colors.primary },
-  chipTxt: { color: theme.colors.textSecondary, fontWeight: '600', fontSize: 13 },
-  chipTxtSel: { color: theme.colors.primary },
-  primaryBtn: { backgroundColor: theme.colors.primary, borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-  primaryBtnTxt: { color: '#FFF', fontWeight: '700', fontSize: 16 },
-  switchMode: { alignItems: 'center', marginTop: 10 },
-  switchTxt: { color: theme.colors.primary, fontWeight: '600', fontSize: 14 },
-  severityRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  sevDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  sevDotActive: { backgroundColor: theme.colors.primary },
-  sevNum: { fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary },
-  sevNumActive: { color: '#FFF' },
-  toggleRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  toggleBtn: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FFF' },
-  toggleActive: { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' },
-  toggleTxt: { fontWeight: '600', color: theme.colors.textSecondary },
-  toggleTxtActive: { color: '#92400E' },
-  vitalRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  vitalLabel: { width: 100, fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary },
-  vitalInput: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, backgroundColor: '#F9FAFB', fontSize: 15 },
-  warning: { color: theme.colors.danger, fontWeight: '700', fontSize: 13, marginBottom: 6 },
-  hintText: { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6, marginBottom: 4, fontSize: 12 },
-  skipBtn: { alignItems: 'center', marginTop: 8 },
-  skipTxt: { color: theme.colors.textSecondary, fontWeight: '600', fontSize: 14 },
-  loadingArea: { height: 120, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1, backgroundColor: BG },
+
+  /* ── Welcome ── */
+  welcomeScroll: { paddingBottom: 170 },
+  welcomeHeader: { alignItems: 'center', paddingTop: 52, paddingBottom: 8 },
+  logoCircle: {
+    width: 68, height: 68, borderRadius: 34,
+    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
+  logoText: { color: WHITE, fontSize: 34, fontWeight: '900' },
+  welcomeTitle: { fontSize: 26, fontWeight: '800', color: TEXT },
+  welcomeSubtitle: { fontSize: 14, color: SUBTLE, marginTop: 4 },
+
+  greetingBox: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8 },
+  greetingHi: { fontSize: 30, fontWeight: '700', color: TEXT },
+  greetingQ: { fontSize: 18, color: TEXT, marginTop: 6, fontWeight: '500' },
+  greetingHint: { fontSize: 13, color: SUBTLE, marginTop: 8, lineHeight: 20 },
+
+  chipGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 16, gap: 10, marginTop: 12,
+  },
+  symptomChip: {
+    width: '29%',
+    backgroundColor: WHITE,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  chipPressed: { backgroundColor: '#EBF4FF', borderColor: PRIMARY },
+  symptomEmoji: { fontSize: 30 },
+  symptomLabel: { fontSize: 11, color: TEXT, marginTop: 6, fontWeight: '600', textAlign: 'center' },
+
+  orRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 24, marginTop: 24, gap: 10,
+  },
+  orLine: { flex: 1, height: 1, backgroundColor: BORDER },
+  orText: { color: SUBTLE, fontSize: 13 },
+
+  /* ── Bottom bar (welcome + chat text input) ── */
+  bottomBar: {
+    backgroundColor: WHITE,
+    borderTopWidth: 1, borderTopColor: BORDER,
+    paddingHorizontal: 16, paddingVertical: 12,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+  },
+  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  typingText: { color: SUBTLE, fontSize: 13, fontStyle: 'italic' },
+  errorTextSmall: { color: '#DC2626', fontSize: 13, marginBottom: 8 },
+
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  textInput: {
+    flex: 1,
+    minHeight: 46, maxHeight: 110,
+    borderWidth: 1.5, borderColor: BORDER, borderRadius: 24,
+    paddingHorizontal: 18, paddingVertical: 10,
+    backgroundColor: '#F9FAFB',
+    fontSize: 15, color: TEXT,
+  },
+  sendBtn: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: PRIMARY,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  sendBtnOff: { opacity: 0.35 },
+  sendBtnIcon: { color: WHITE, fontSize: 22, fontWeight: '700' },
+
+  /* ── Analyzing ── */
+  analyzingRoot: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  analyzingCard: {
+    backgroundColor: WHITE, borderRadius: 24, padding: 36,
+    alignItems: 'center', width: '100%',
+    shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 20, shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  analyzingTitle: { fontSize: 22, fontWeight: '800', color: TEXT, textAlign: 'center' },
+  analyzingSubtitle: { fontSize: 14, color: SUBTLE, marginTop: 10, textAlign: 'center', lineHeight: 22 },
+  analyzingDots: { flexDirection: 'row', gap: 8, marginTop: 24 },
+  analyzingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: PRIMARY, opacity: 0.5 },
+
+  /* ── Chat header ── */
+  chatHeader: {
+    backgroundColor: WHITE,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: BORDER,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  chatHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoCircleSmall: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+  },
+  logoTextSmall: { color: WHITE, fontSize: 20, fontWeight: '900' },
+  chatHeaderTitle: { fontSize: 16, fontWeight: '700', color: TEXT },
+  chatHeaderSub: { fontSize: 12, color: SUBTLE, marginTop: 1 },
+  progressDots: { flexDirection: 'row', gap: 5 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  dotFilled: { backgroundColor: PRIMARY },
+  dotEmpty: { backgroundColor: BORDER },
+
+  /* ── Chat list ── */
+  chatList: { paddingHorizontal: 12, paddingVertical: 16, flexGrow: 1 },
+
+  /* ── Bubbles ── */
+  bubbleWrap: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 },
+  bubbleWrapLeft: { justifyContent: 'flex-start' },
+  bubbleWrapRight: { justifyContent: 'flex-end' },
+  aiAvatar: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: PRIMARY,
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: 6, flexShrink: 0,
+  },
+  aiAvatarText: { color: WHITE, fontSize: 14, fontWeight: '900' },
+  bubble: { maxWidth: '80%', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  aiBubble: {
+    backgroundColor: WHITE,
+    borderBottomLeftRadius: 4,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  userBubble: { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
+  bubbleText: { fontSize: 15, lineHeight: 22, color: TEXT },
+  userBubbleText: { color: WHITE },
+
+  /* ── Typing bubble ── */
+  typingBubble: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 6 },
+  typingDotsBox: {
+    backgroundColor: WHITE, borderRadius: 16,
+    paddingHorizontal: 16, paddingVertical: 10,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  typingDotsText: { fontSize: 10, color: SUBTLE, letterSpacing: 5 },
+
+  /* ── Error banner ── */
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 16, paddingVertical: 10,
+    marginHorizontal: 12, borderRadius: 10, marginBottom: 4,
+  },
+  errorBannerText: { color: '#DC2626', fontSize: 13, flex: 1 },
+  errorBannerClose: { color: '#DC2626', fontSize: 18, fontWeight: '700', paddingLeft: 12 },
+
+  /* ── Q&A option chips ── */
+  optionsContainer: {
+    backgroundColor: BG,
+    paddingTop: 10, paddingBottom: 6,
+    borderTopWidth: 1, borderTopColor: BORDER,
+  },
+  optionsHint: { fontSize: 12, color: SUBTLE, paddingHorizontal: 16, marginBottom: 8, fontWeight: '600' },
+  optionsScroll: { paddingHorizontal: 12, gap: 8, paddingBottom: 10 },
+  optionChip: {
+    backgroundColor: WHITE,
+    borderRadius: 22, paddingVertical: 11, paddingHorizontal: 20,
+    borderWidth: 1.5, borderColor: PRIMARY,
+  },
+  optionChipPressed: { backgroundColor: '#EBF4FF' },
+  optionChipText: { color: PRIMARY, fontSize: 14, fontWeight: '700' },
+  optionChipOther: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 22, paddingVertical: 11, paddingHorizontal: 20,
+    borderWidth: 1.5, borderColor: BORDER,
+  },
+  optionChipOtherText: { color: SUBTLE, fontSize: 14, fontWeight: '600' },
+
+  backBtn: { paddingRight: 4 },
+  backBtnText: { color: PRIMARY, fontSize: 13, fontWeight: '600' },
 });

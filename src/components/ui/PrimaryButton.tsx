@@ -6,14 +6,19 @@ type PrimaryButtonProps = {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'danger' | 'neutral';
+  disabled?: boolean;
 };
 
-export const PrimaryButton: React.FC<PrimaryButtonProps> = ({ title, onPress, variant = 'primary' }) => {
+export const PrimaryButton: React.FC<PrimaryButtonProps> = ({ title, onPress, variant = 'primary', disabled = false }) => {
   const backgroundColor =
     variant === 'danger' ? theme.colors.danger : variant === 'neutral' ? '#374151' : theme.colors.primary;
 
   return (
-    <Pressable style={[styles.button, { backgroundColor }]} onPress={onPress}>
+    <Pressable
+      style={[styles.button, { backgroundColor }, disabled && styles.disabled]}
+      onPress={onPress}
+      disabled={disabled}
+    >
       <Text style={styles.label}>{title}</Text>
     </Pressable>
   );
@@ -26,6 +31,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  disabled: {
+    opacity: 0.4,
   },
   label: {
     color: '#FFFFFF',

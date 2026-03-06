@@ -21,6 +21,7 @@ export type PatientStackParamList = {
   MildCaseDashboard: undefined;
   DoctorNeededDashboard: undefined;
   EmergencyDashboard: { classificationId: string };
+  DoctorSelectionScreen: undefined;
   /* Shared */
   RecordsScreen: undefined;
   CaseDetailScreen: { caseId: string };

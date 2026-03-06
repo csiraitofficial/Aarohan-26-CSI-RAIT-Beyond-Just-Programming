@@ -11,6 +11,7 @@ import { SymptomAgentScreen } from '../screens/Patient/Symptom/SymptomAgentScree
 import { MildCaseDashboard } from '../screens/Patient/Symptom/MildCaseDashboard';
 import { DoctorNeededDashboard } from '../screens/Patient/Symptom/DoctorNeededDashboard';
 import { EmergencyDashboard } from '../screens/Patient/Symptom/EmergencyDashboard';
+import { DoctorSelectionScreen } from '../screens/Patient/Symptom/DoctorSelectionScreen';
 import { RecordsScreen } from '../screens/Patient/RecordsScreen';
 import { CaseDetailScreen } from '../screens/Patient/CaseDetailScreen';
 import { RemindersScreen } from '../screens/Patient/RemindersScreen';
@@ -35,6 +36,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="MildCaseDashboard" component={MildCaseDashboard} options={{ title: 'Self-Care Plan', headerShown: false }} />
       <HomeStack.Screen name="DoctorNeededDashboard" component={DoctorNeededDashboard} options={{ title: 'Doctor Needed', headerShown: false }} />
       <HomeStack.Screen name="EmergencyDashboard" component={EmergencyDashboard} options={{ title: '🚨 Emergency', headerShown: false }} />
+      <HomeStack.Screen name="DoctorSelectionScreen" component={DoctorSelectionScreen} options={{ title: 'Select Doctor', headerShown: false }} />
       {/* Legacy screens */}
       <HomeStack.Screen name="SymptomScreen" component={SymptomScreen} options={{ title: 'Check Symptoms' }} />
       <HomeStack.Screen name="AISubmitScreen" component={AISubmitScreen} options={{ title: 'AI Result' }} />
@@ -54,6 +56,7 @@ function SymptomsStackScreen() {
       <SymptomsStack.Screen name="MildCaseDashboard" component={MildCaseDashboard} options={{ title: 'Self-Care Plan', headerShown: false }} />
       <SymptomsStack.Screen name="DoctorNeededDashboard" component={DoctorNeededDashboard} options={{ title: 'Doctor Needed', headerShown: false }} />
       <SymptomsStack.Screen name="EmergencyDashboard" component={EmergencyDashboard} options={{ title: '🚨 Emergency', headerShown: false }} />
+      <SymptomsStack.Screen name="DoctorSelectionScreen" component={DoctorSelectionScreen} options={{ title: 'Select Doctor', headerShown: false }} />
       {/* Legacy */}
       <SymptomsStack.Screen name="SymptomScreen" component={SymptomScreen} options={{ title: 'Check Symptoms' }} />
       <SymptomsStack.Screen name="AISubmitScreen" component={AISubmitScreen} options={{ title: 'AI Result' }} />
