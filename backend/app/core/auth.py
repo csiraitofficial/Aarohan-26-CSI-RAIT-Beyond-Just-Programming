@@ -5,8 +5,8 @@ Authentication utilities: password hashing, JWT token creation/validation.
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt as _bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -15,23 +15,21 @@ from app.core.config import settings
 from app.db.database import get_db
 from app.models.models import User
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # OAuth2 scheme for JWT bearer tokens
-# Note: tokenUrl is for Swagger UI auto-discovery; our actual login uses JSON body.
-# Using auto_error=True so missing tokens raise 401 automatically.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 
 def hash_password(password: str) -> str:
     """Hash a plaintext password using bcrypt."""
-    return pwd_context.hash(password)
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plaintext password against a hashed password."""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return _bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    except Exception:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

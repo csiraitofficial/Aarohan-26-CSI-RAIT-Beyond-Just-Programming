@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../utils/theme';
 
 /* ─── Types ─── */
@@ -106,14 +107,14 @@ type FilterType = 'all' | 'emergency' | 'consultation' | 'message' | 'report' | 
 
 const TYPE_CONFIG: Record<
   string,
-  { icon: string; color: string; bg: string; label: string }
+  { icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string; bg: string; label: string }
 > = {
-  emergency: { icon: '🚨', color: '#DC2626', bg: '#FEF2F2', label: 'Emergency' },
-  consultation: { icon: '💬', color: '#2563EB', bg: '#EFF6FF', label: 'Consultation' },
-  message: { icon: '✉️', color: '#7C3AED', bg: '#F5F3FF', label: 'Message' },
-  report: { icon: '📄', color: '#059669', bg: '#ECFDF5', label: 'Report' },
-  system: { icon: '⚙️', color: '#64748B', bg: '#F1F5F9', label: 'System' },
-  reminder: { icon: '🔔', color: '#D97706', bg: '#FFFBEB', label: 'Reminder' },
+  emergency: { icon: 'alert-circle-outline', color: '#DC2626', bg: '#FEF2F2', label: 'Emergency' },
+  consultation: { icon: 'chat-outline', color: '#2563EB', bg: '#EFF6FF', label: 'Consultation' },
+  message: { icon: 'email-outline', color: '#7C3AED', bg: '#F5F3FF', label: 'Message' },
+  report: { icon: 'file-document-outline', color: '#059669', bg: '#ECFDF5', label: 'Report' },
+  system: { icon: 'cog-outline', color: '#64748B', bg: '#F1F5F9', label: 'System' },
+  reminder: { icon: 'bell-outline', color: '#D97706', bg: '#FFFBEB', label: 'Reminder' },
 };
 
 const FILTERS: FilterType[] = ['all', 'emergency', 'consultation', 'message', 'report', 'reminder'];
@@ -180,7 +181,7 @@ export const DoctorNotificationsScreen: React.FC = () => {
               ]}
               onPress={() => setFilter(f)}
             >
-              {cfg && <Text style={{ fontSize: 12 }}>{cfg.icon}</Text>}
+              {cfg && <MaterialCommunityIcons name={cfg.icon} size={14} color={cfg.color} />}
               <Text
                 style={[
                   styles.filterChipText,
@@ -206,7 +207,7 @@ export const DoctorNotificationsScreen: React.FC = () => {
       <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={{ fontSize: 48 }}>🔔</Text>
+            <MaterialCommunityIcons name="bell-outline" size={48} color="#94A3B8" />
             <Text style={styles.emptyTitle}>No notifications</Text>
             <Text style={styles.emptySubtitle}>
               You're all caught up! New alerts will appear here.
@@ -222,7 +223,7 @@ export const DoctorNotificationsScreen: React.FC = () => {
                 onPress={() => markRead(notif.id)}
               >
                 <View style={[styles.notifIcon, { backgroundColor: cfg.bg }]}>
-                  <Text style={{ fontSize: 18 }}>{cfg.icon}</Text>
+                  <MaterialCommunityIcons name={cfg.icon} size={20} color={cfg.color} />
                 </View>
                 <View style={styles.notifContent}>
                   <View style={styles.notifHeader}>
@@ -239,7 +240,7 @@ export const DoctorNotificationsScreen: React.FC = () => {
                     {notif.patientName && (
                       <View style={styles.notifPatientTag}>
                         <Text style={styles.notifPatientTagText}>
-                          👤 {notif.patientName}
+                          <MaterialCommunityIcons name="account-outline" size={10} color="#475569" /> {notif.patientName}
                         </Text>
                       </View>
                     )}

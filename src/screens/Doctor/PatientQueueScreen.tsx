@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../utils/theme';
 import { RiskLevel } from '../../models';
 
@@ -184,16 +185,16 @@ export const PatientQueueScreen: React.FC = () => {
 
       {/* ─── Stat Strip ─── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.statStrip}>
-        <StatChip icon="👥" value={stats.total}     label="Total"     accent="#3B82F6" />
-        <StatChip icon="🔴" value={stats.emergency} label="Critical"  accent="#DC2626" />
-        <StatChip icon="🟠" value={stats.urgent}    label="Urgent"    accent="#D97706" />
-        <StatChip icon="🟢" value={stats.stable}    label="Stable"    accent="#059669" />
+        <StatChip icon="account-group-outline" value={stats.total}     label="Total"     accent="#3B82F6" />
+        <StatChip icon="circle" value={stats.emergency} label="Critical"  accent="#DC2626" />
+        <StatChip icon="circle" value={stats.urgent}    label="Urgent"    accent="#D97706" />
+        <StatChip icon="circle" value={stats.stable}    label="Stable"    accent="#059669" />
       </ScrollView>
 
       {/* ─── Search ─── */}
       <View style={s.searchWrap}>
         <View style={s.searchBox}>
-          <Text style={s.searchIco}>🔍</Text>
+          <Text style={s.searchIco}><MaterialCommunityIcons name="magnify" size={16} color="#94A3B8" /></Text>
           <TextInput
             style={s.searchInput}
             placeholder="Search by name, ID or symptom…"
@@ -203,7 +204,7 @@ export const PatientQueueScreen: React.FC = () => {
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch('')} hitSlop={8}>
-              <Text style={s.clearX}>✕</Text>
+              <Text style={s.clearX}><MaterialCommunityIcons name="close" size={14} color="#94A3B8" /></Text>
             </Pressable>
           )}
         </View>
@@ -232,7 +233,7 @@ export const PatientQueueScreen: React.FC = () => {
       <ScrollView style={s.list} contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
         {filtered.length === 0 ? (
           <View style={s.empty}>
-            <Text style={{ fontSize: 48 }}>🔎</Text>
+            <MaterialCommunityIcons name="file-search-outline" size={48} color="#94A3B8" />
             <Text style={s.emptyTitle}>No patients match</Text>
             <Text style={s.emptySub}>Try changing filters or search terms</Text>
           </View>
@@ -268,7 +269,7 @@ const StatChip: React.FC<{ icon: string; value: number; label: string; accent: s
 }) => (
   <View style={[s.statCard, { borderColor: accent + '18' }]}>
     <View style={[s.statIconWrap, { backgroundColor: accent + '14' }]}>
-      <Text style={{ fontSize: 16 }}>{icon}</Text>
+      <MaterialCommunityIcons name={icon as any} size={16} color={accent} />
     </View>
     <Text style={[s.statVal, { color: accent }]}>{value}</Text>
     <Text style={s.statLbl}>{label}</Text>
@@ -372,11 +373,11 @@ const DetailSheet: React.FC<{ patient: QueuePatient; onClose: () => void }> = ({
         {/* Profile Card */}
         <View style={[s.profileCard, { borderColor: r.color + '25' }]}>
           <View style={[s.profileAvatar, { backgroundColor: r.bg }]}>
-            <Text style={{ fontSize: 32 }}>{patient.gender === 'M' ? '👨' : '👩'}</Text>
+            <MaterialCommunityIcons name={patient.gender === 'M' ? 'account' : 'account'} size={32} color={r.color} />
           </View>
           <Text style={s.profileName}>{patient.name}</Text>
           <Text style={s.profileMeta}>{patient.age} years  ·  {patient.gender === 'M' ? 'Male' : 'Female'}  ·  {patient.id}</Text>
-          <Text style={s.profileLoc}>📍 {patient.location}  ·  Assigned {patient.assignedTime}</Text>
+          <Text style={s.profileLoc}><MaterialCommunityIcons name="map-marker-outline" size={12} color="#94A3B8" /> {patient.location}  ·  Assigned {patient.assignedTime}</Text>
           {/* Insurance badge */}
           <View style={[s.insBadge,
             patient.insuranceStatus === 'active'  ? { backgroundColor: '#ECFDF5' } :
@@ -400,7 +401,7 @@ const DetailSheet: React.FC<{ patient: QueuePatient; onClose: () => void }> = ({
           {(['overview', 'vitals', 'history'] as const).map((t) => (
             <Pressable key={t} onPress={() => setTab(t)} style={[s.tab, tab === t && s.tabOn]}>
               <Text style={[s.tabText, tab === t && s.tabTextOn]}>
-                {t === 'overview' ? '🩺 Overview' : t === 'vitals' ? '💓 Vitals' : '📂 History'}
+                {t === 'overview' ? 'Overview' : t === 'vitals' ? 'Vitals' : 'History'}
               </Text>
             </Pressable>
           ))}
@@ -414,7 +415,7 @@ const DetailSheet: React.FC<{ patient: QueuePatient; onClose: () => void }> = ({
         {/* Allergy Banner */}
         {patient.allergies.length > 0 && (
           <View style={s.allergyBanner}>
-            <Text style={s.allergyTitle}>⚠️  Known Allergies</Text>
+            <Text style={s.allergyTitle}><MaterialCommunityIcons name="alert-outline" size={14} color="#92400E" />  Known Allergies</Text>
             <View style={s.allergyChips}>
               {patient.allergies.map((a, i) => (
                 <View key={i} style={s.allergyPill}>
@@ -428,17 +429,17 @@ const DetailSheet: React.FC<{ patient: QueuePatient; onClose: () => void }> = ({
         {/* Actions */}
         <View style={s.sheetActions}>
           <Pressable style={[s.sheetBtn, { backgroundColor: theme.colors.primary }]}>
-            <Text style={s.sheetBtnText}>💬  Start Consultation</Text>
+            <Text style={s.sheetBtnText}><MaterialCommunityIcons name="chat-outline" size={16} color="#FFF" />  Start Consultation</Text>
           </Pressable>
           <View style={s.sheetBtnRow}>
             <Pressable style={[s.sheetBtnSm, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-              <Text style={[s.sheetBtnSmText, { color: '#059669' }]}>📝 Add Note</Text>
+              <Text style={[s.sheetBtnSmText, { color: '#059669' }]}><MaterialCommunityIcons name="note-edit-outline" size={14} color="#059669" /> Add Note</Text>
             </Pressable>
             <Pressable style={[s.sheetBtnSm, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
-              <Text style={[s.sheetBtnSmText, { color: '#2563EB' }]}>📄 Records</Text>
+              <Text style={[s.sheetBtnSmText, { color: '#2563EB' }]}><MaterialCommunityIcons name="file-document-outline" size={14} color="#2563EB" /> Records</Text>
             </Pressable>
             <Pressable style={[s.sheetBtnSm, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-              <Text style={[s.sheetBtnSmText, { color: '#DC2626' }]}>🚨 Escalate</Text>
+              <Text style={[s.sheetBtnSmText, { color: '#DC2626' }]}><MaterialCommunityIcons name="alert-circle-outline" size={14} color="#DC2626" /> Escalate</Text>
             </Pressable>
           </View>
         </View>
@@ -493,10 +494,10 @@ const OverviewTab: React.FC<{ patient: QueuePatient }> = ({ patient }) => {
       {/* Quick Info */}
       <Text style={[s.secTitle, { marginTop: 16 }]}>Quick Info</Text>
       <View style={s.infoGrid}>
-        <InfoTile icon="🕐" label="Wait Time" value={formatWait(patient.waitTime)} />
-        <InfoTile icon="📅" label="Last Visit" value={patient.lastVisit} />
-        <InfoTile icon="📍" label="Location" value={patient.location} />
-        <InfoTile icon="⏰" label="Assigned" value={patient.assignedTime} />
+        <InfoTile icon="clock-outline" label="Wait Time" value={formatWait(patient.waitTime)} />
+        <InfoTile icon="calendar-outline" label="Last Visit" value={patient.lastVisit} />
+        <InfoTile icon="map-marker-outline" label="Location" value={patient.location} />
+        <InfoTile icon="clock-check-outline" label="Assigned" value={patient.assignedTime} />
       </View>
     </View>
   );
@@ -507,20 +508,20 @@ const VitalsTab: React.FC<{ patient: QueuePatient }> = ({ patient }) => (
   <View style={s.tabContent}>
     <View style={s.vitGrid}>
       <VitalGauge
-        icon="💓" label="Heart Rate" value={`${patient.vitals.hr}`} unit="bpm"
+        icon="heart-pulse" label="Heart Rate" value={`${patient.vitals.hr}`} unit="bpm"
         normal="60–100" alert={patient.vitals.hr > 100}
       />
       <VitalGauge
-        icon="🩸" label="Blood Pressure" value={patient.vitals.bp} unit="mmHg"
+        icon="water" label="Blood Pressure" value={patient.vitals.bp} unit="mmHg"
         normal="120/80" alert={false}
       />
       <VitalGauge
-        icon="🌡️" label="Temperature" value={`${patient.vitals.temp}`} unit="°F"
+        icon="thermometer" label="Temperature" value={`${patient.vitals.temp}`} unit="°F"
         normal="97.8–99.1" alert={patient.vitals.temp > 100.4}
       />
     </View>
     <View style={s.vitNote}>
-      <Text style={s.vitNoteIcon}>ℹ️</Text>
+      <Text style={s.vitNoteIcon}><MaterialCommunityIcons name="information-outline" size={14} color="#0369A1" /></Text>
       <Text style={s.vitNoteText}>Vitals auto-updated from connected devices. Last sync: 2 min ago</Text>
     </View>
   </View>
@@ -532,7 +533,7 @@ const HistoryTab: React.FC<{ patient: QueuePatient }> = ({ patient }) => (
     <Text style={s.secTitle}>Medical History</Text>
     {patient.history.length === 0 ? (
       <View style={s.histEmpty}>
-        <Text style={{ fontSize: 32 }}>📋</Text>
+        <MaterialCommunityIcons name="clipboard-text-outline" size={32} color="#94A3B8" />
         <Text style={s.histEmptyText}>No significant medical history recorded</Text>
       </View>
     ) : (
@@ -557,7 +558,7 @@ const VitalGauge: React.FC<{
   icon: string; label: string; value: string; unit: string; normal: string; alert: boolean;
 }> = ({ icon, label, value, unit, normal, alert }) => (
   <View style={[s.gaugeCard, alert && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-    <Text style={{ fontSize: 22 }}>{icon}</Text>
+    <MaterialCommunityIcons name={icon as any} size={22} color={alert ? '#DC2626' : '#334155'} />
     <Text style={[s.gaugeVal, alert && { color: '#DC2626' }]}>{value}</Text>
     <Text style={s.gaugeUnit}>{unit}</Text>
     <Text style={s.gaugeLbl}>{label}</Text>
@@ -569,7 +570,7 @@ const VitalGauge: React.FC<{
 /* ── Info Tile ── */
 const InfoTile: React.FC<{ icon: string; label: string; value: string }> = ({ icon, label, value }) => (
   <View style={s.infoTile}>
-    <Text style={{ fontSize: 16 }}>{icon}</Text>
+    <MaterialCommunityIcons name={icon as any} size={16} color="#64748B" />
     <Text style={s.infoVal}>{value}</Text>
     <Text style={s.infoLbl}>{label}</Text>
   </View>

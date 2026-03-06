@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../components/ui/SecondaryButton';
@@ -31,7 +32,9 @@ export const ProfileScreen: React.FC = () => {
       <SectionHeader title="My Profile" />
 
       <Card style={styles.avatarCard}>
-        <Text style={styles.avatar}>👩🏽</Text>
+        <View style={styles.avatarWrap}>
+          <MaterialCommunityIcons name="account" size={40} color={theme.colors.primary} />
+        </View>
         <Text style={styles.name}>{profile.name}</Text>
         <Text style={styles.meta}>{profile.age} yrs • {profile.gender}</Text>
       </Card>
@@ -61,12 +64,12 @@ export const ProfileScreen: React.FC = () => {
           <Row label="Medical History" value={profile.medicalHistory} />
           <Row label="Allergies" value={profile.allergies.length > 0 ? profile.allergies.join(', ') : 'None'} />
           <View style={{ height: 16 }} />
-          <PrimaryButton title="✏️ Edit Profile" onPress={() => setEditing(true)} />
+          <PrimaryButton title="Edit Profile" onPress={() => setEditing(true)} />
         </Card>
       )}
 
       <View style={styles.logoutWrap}>
-        <SecondaryButton title="🚪 Logout" onPress={confirmLogout} />
+        <SecondaryButton title="Logout" onPress={confirmLogout} />
       </View>
     </ScrollView>
   );
@@ -90,7 +93,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   content: { padding: theme.spacing.lg, paddingBottom: 40 },
   avatarCard: { alignItems: 'center', paddingVertical: 24 },
-  avatar: { fontSize: 48, marginBottom: 8 },
+  avatarWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#EBF3FF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   name: { fontSize: 22, fontWeight: '800', color: theme.colors.textPrimary },
   meta: { color: theme.colors.textSecondary, marginTop: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },

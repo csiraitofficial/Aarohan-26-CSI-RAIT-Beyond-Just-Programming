@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher';
@@ -15,7 +16,9 @@ export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.illustration}>🏥</Text>
+        <View style={styles.illustration}>
+          <MaterialCommunityIcons name="hospital-building" size={56} color={theme.colors.primary} />
+        </View>
         <Text style={styles.logo}>Aarohan</Text>
         <Text style={styles.tagline}>{t('tagline')}</Text>
         <LanguageSwitcher />
@@ -39,7 +42,12 @@ const styles = StyleSheet.create({
     gap: 16
   },
   illustration: {
-    fontSize: 64
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EBF3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logo: {
     fontSize: 32,

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   VictoryChart,
@@ -17,11 +18,11 @@ import { theme } from '../../utils/theme';
 
 type Props = NativeStackScreenProps<PatientStackParamList, 'RecordsScreen'>;
 
-const FILTERS: Array<{ key: RiskLevel | 'all'; label: string; emoji: string }> = [
-  { key: 'all',       label: 'All',       emoji: '📋' },
-  { key: 'mild',      label: 'Mild',      emoji: '🟢' },
-  { key: 'moderate',  label: 'Moderate',  emoji: '🟡' },
-  { key: 'emergency', label: 'Emergency', emoji: '🔴' },
+const FILTERS: Array<{ key: RiskLevel | 'all'; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }> = [
+  { key: 'all',       label: 'All',       icon: 'clipboard-text-outline' },
+  { key: 'mild',      label: 'Mild',      icon: 'circle' },
+  { key: 'moderate',  label: 'Moderate',  icon: 'circle' },
+  { key: 'emergency', label: 'Emergency', icon: 'circle' },
 ];
 
 const RISK_COLOR: Record<RiskLevel, string> = {
@@ -127,7 +128,7 @@ const RecordCard: React.FC<{ record: CaseRecord; onPress: () => void }> = ({ rec
   const dateObj   = new Date(c.date);
   const day       = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   const year      = dateObj.getFullYear();
-  const referral  = c.result.risk === 'emergency' ? '🚨 Emergency Referral' : c.result.risk === 'moderate' ? '👨‍⚕️ Doctor Recommended' : '✅ Not Required';
+  const referral  = c.result.risk === 'emergency' ? 'Emergency Referral' : c.result.risk === 'moderate' ? 'Doctor Recommended' : 'Not Required';
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [rcStyles.card, pressed && { opacity: 0.88 }]}>
@@ -351,12 +352,12 @@ export const RecordsScreen: React.FC<Props> = ({ navigation }) => {
           </>
         ) : lineData.length === 1 ? (
           <View style={styles.emptyChart}>
-            <Text style={styles.emptyChartIcon}>📊</Text>
+            <MaterialCommunityIcons name="chart-bar" size={36} color={theme.colors.textSecondary} style={{ marginBottom: 8 }} />
             <Text style={styles.emptyChartTxt}>Need 2+ records to show trend</Text>
           </View>
         ) : (
           <View style={styles.emptyChart}>
-            <Text style={styles.emptyChartIcon}>📊</Text>
+            <MaterialCommunityIcons name="chart-bar" size={36} color={theme.colors.textSecondary} style={{ marginBottom: 8 }} />
             <Text style={styles.emptyChartTxt}>No health data yet</Text>
           </View>
         )}
@@ -375,7 +376,16 @@ export const RecordsScreen: React.FC<Props> = ({ navigation }) => {
               style={[styles.filterChip, active && styles.filterActive]}
               onPress={() => setFilter(f.key)}
             >
-              <Text style={styles.filterEmoji}>{f.emoji}</Text>
+              <MaterialCommunityIcons
+                name={f.icon}
+                size={13}
+                color={active
+                  ? f.key === 'all' ? theme.colors.primary
+                    : f.key === 'mild' ? RISK_COLOR.mild
+                    : f.key === 'moderate' ? RISK_COLOR.moderate
+                    : RISK_COLOR.emergency
+                  : theme.colors.textSecondary}
+              />
               <Text style={[styles.filterTxt, active && styles.filterTxtActive]}>{f.label}</Text>
               <View style={[styles.filterBadge, active && styles.filterBadgeActive]}>
                 <Text style={[styles.filterBadgeTxt, active && styles.filterBadgeTxtActive]}>{cnt}</Text>
@@ -400,7 +410,7 @@ export const RecordsScreen: React.FC<Props> = ({ navigation }) => {
       ════════════════════════════════════════ */}
       {sortedList.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>🗂️</Text>
+          <MaterialCommunityIcons name="folder-open-outline" size={52} color={theme.colors.textSecondary} style={{ marginBottom: 12 }} />
           <Text style={styles.emptyStateTitle}>No records found</Text>
           <Text style={styles.emptyStateSub}>Try changing the filter or complete a health check first.</Text>
         </View>
@@ -473,7 +483,7 @@ const styles = StyleSheet.create({
   trendLegTxt: { fontSize: 11, fontWeight: '600', color: theme.colors.textSecondary },
 
   emptyChart: { alignItems: 'center', paddingVertical: 28 },
-  emptyChartIcon: { fontSize: 36, marginBottom: 8 },
+  // emptyChartIcon removed — using MaterialCommunityIcons inline
   emptyChartTxt: { fontSize: 14, color: theme.colors.textSecondary, fontWeight: '600' },
 
   /* Filter chips */
@@ -485,7 +495,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
   },
   filterActive: { borderColor: theme.colors.primary, backgroundColor: '#EBF3FF' },
-  filterEmoji: { fontSize: 13 },
+  // filterEmoji removed — using MaterialCommunityIcons inline
   filterTxt: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary },
   filterTxtActive: { color: theme.colors.primary },
   filterBadge: { backgroundColor: theme.colors.border, borderRadius: 999, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
@@ -500,7 +510,7 @@ const styles = StyleSheet.create({
 
   /* Empty state */
   emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyStateIcon: { fontSize: 52, marginBottom: 12 },
+  // emptyStateIcon removed — using MaterialCommunityIcons inline
   emptyStateTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.textPrimary, marginBottom: 6 },
   emptyStateSub: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 });
