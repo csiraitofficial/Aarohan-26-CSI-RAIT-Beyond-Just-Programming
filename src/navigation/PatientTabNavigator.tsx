@@ -17,6 +17,8 @@ import { CaseDetailScreen } from '../screens/Patient/CaseDetailScreen';
 import { RemindersScreen } from '../screens/Patient/RemindersScreen';
 import { ProfileScreen } from '../screens/Patient/ProfileScreen';
 import { EmergencyScreen } from '../screens/Patient/EmergencyScreen';
+import { MediScanScreen } from '../screens/Patient/MediScanScreen';
+import { MediScanResultScreen } from '../screens/Patient/MediScanResultScreen';
 
 import { theme } from '../utils/theme';
 import { LogoutButton } from '../components/ui/LogoutButton';
@@ -61,6 +63,16 @@ function SymptomsStackScreen() {
       <SymptomsStack.Screen name="SymptomScreen" component={SymptomScreen} options={{ title: 'Check Symptoms' }} />
       <SymptomsStack.Screen name="AISubmitScreen" component={AISubmitScreen} options={{ title: 'AI Result' }} />
     </SymptomsStack.Navigator>
+  );
+}
+
+const MediScanStack = createNativeStackNavigator<PatientStackParamList>();
+function MediScanStackScreen() {
+  return (
+    <MediScanStack.Navigator>
+      <MediScanStack.Screen name="MediScanScreen" component={MediScanScreen} options={{ title: 'MediScan AI', headerShown: false }} />
+      <MediScanStack.Screen name="MediScanResultScreen" component={MediScanResultScreen} options={{ title: 'Scan Results', headerShown: false }} />
+    </MediScanStack.Navigator>
   );
 }
 
@@ -128,6 +140,15 @@ export const PatientTabNavigator: React.FC = () => {
           title: 'AI Health Check',
           tabBarLabel: 'Symptoms',
           tabBarIcon: () => <TabIcon emoji="🩺" />,
+        }}
+      />
+      <Tab.Screen
+        name="MediScanTab"
+        component={MediScanStackScreen}
+        options={{
+          title: 'MediScan AI',
+          tabBarLabel: 'MediScan',
+          tabBarIcon: () => <TabIcon emoji="🩻" />,
         }}
       />
       <Tab.Screen

@@ -203,3 +203,24 @@ class ConversationTurn(Base):
 
     # Relationships
     consultation = relationship("ConsultationSession", back_populates="conversation_turns")
+
+
+class MediScanRecord(Base):
+    """Medical image scan record from MediScan AI analysis."""
+
+    __tablename__ = "mediscan_records"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    description = Column(Text, nullable=True)
+    disease = Column(String(200), nullable=False)
+    confidence = Column(Float, nullable=False)
+    severity = Column(String(20), nullable=False)  # none, moderate, high, critical
+    is_critical = Column(Boolean, default=False)
+    top_predictions = Column(Text, nullable=True)  # JSON list
+    clinical_info = Column(Text, nullable=True)
+    recommendations = Column(Text, nullable=True)  # JSON list
+    created_at = Column(DateTime, default=utcnow)
+
+    # Relationships
+    user = relationship("User")

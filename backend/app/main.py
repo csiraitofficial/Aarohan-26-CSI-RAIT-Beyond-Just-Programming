@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.security import setup_security
 from app.db.database import engine, Base
-from app.api import auth, symptom_collection, triage, health, symptom_agent
+from app.api import auth, symptom_collection, triage, health, symptom_agent, mediscan
 
 
 def create_app() -> FastAPI:
@@ -57,6 +57,15 @@ def create_app() -> FastAPI:
         prefix="/api/symptom-agent",
         tags=["AI Symptom Agent"],
     )
+    app.include_router(
+        mediscan.router,
+        prefix="/api/mediscan",
+        tags=["MediScan AI"],
+    )
+
+    # Load MediScan AI model at startup
+    from app.services.mediscan_service import load_mediscan_model
+    load_mediscan_model()
 
     return app
 

@@ -1,4 +1,5 @@
 import { AssessmentResult } from '../models';
+import { MediScanResponse } from '../services/api';
 
 /* Root stack — contains auth screens + role home screens */
 export type RootStackParamList = {
@@ -22,6 +23,9 @@ export type PatientStackParamList = {
   DoctorNeededDashboard: undefined;
   EmergencyDashboard: { classificationId: string };
   DoctorSelectionScreen: undefined;
+  /* MediScan AI */
+  MediScanScreen: undefined;
+  MediScanResultScreen: { result: MediScanResponse };
   /* Shared */
   RecordsScreen: undefined;
   CaseDetailScreen: { caseId: string };
@@ -34,6 +38,7 @@ export type PatientStackParamList = {
 export type PatientTabParamList = {
   HomeTab: undefined;
   SymptomsTab: undefined;
+  MediScanTab: undefined;
   RecordsTab: undefined;
   RemindersTab: undefined;
   ProfileTab: undefined;

@@ -160,3 +160,76 @@ export async function getConversationHistory(sessionId: string, token: string): 
     token,
   });
 }
+
+/* ─── MediScan AI API ─── */
+
+export interface MediScanPrediction {
+  disease: string;
+  confidence: number;
+  class_index: number;
+}
+
+export interface MediScanResponse {
+  scan_id: string;
+  disease: string;
+  confidence: number;
+  severity: string;
+  is_critical: boolean;
+  top5: MediScanPrediction[];
+  gradcam_image: string | null;
+  clinical_info: string;
+  recommendations: string[];
+  warning_signs: string[];
+  medications: string[];
+  disclaimer: string;
+}
+
+export async function uploadMediScan(
+  imageUri: string,
+  description: string,
+  token: string,
+): Promise<MediScanResponse> {
+  const formData = new FormData();
+
+  // Extract filename and type from URI
+  const uriParts = imageUri.split('/');
+  const fileName = uriParts[uriParts.length - 1] || 'scan.jpg';
+  const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+  const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+
+  formData.append('image', {
+    uri: imageUri,
+    name: fileName,
+    type: mimeType,
+  } as any);
+
+  if (description) {
+    formData.append('description', description);
+  }
+
+  const response = await fetch(`${BASE_URL}/api/mediscan/analyze`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // Note: Do NOT set Content-Type for FormData — fetch sets it with boundary
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Scan analysis failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.detail || errorData.error || errorMessage;
+    } catch {
+      // use default
+    }
+    throw new Error(errorMessage);
+  }
+
+  return (await response.json()) as MediScanResponse;
+}
+
+export async function getMediScanStatus(token: string): Promise<{ model_ready: boolean; message: string }> {
+  return apiRequest<{ model_ready: boolean; message: string }>('/api/mediscan/status', { token });
+}
