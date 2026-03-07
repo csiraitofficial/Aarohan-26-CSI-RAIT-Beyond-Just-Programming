@@ -138,3 +138,56 @@ async def analyze_scan(
         medications=result["medications"],
         disclaimer=result["disclaimer"],
     )
+
+
+@router.post("/analyze-test", response_model=MediScanResponse, status_code=status.HTTP_200_OK)
+async def analyze_scan_test(
+    image: UploadFile = File(..., description="Medical image (X-ray, CT scan, etc.)"),
+    description: str = Form("", description="Optional text description or symptoms"),
+):
+    """
+    Test endpoint for MediScan AI without authentication or database saving.
+    """
+    ready, msg = is_model_ready()
+    if not ready:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"MediScan AI model is not available: {msg}",
+        )
+
+    content_type = image.content_type or ""
+    if content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported image type: {content_type}.",
+        )
+
+    image_bytes = await image.read()
+    if len(image_bytes) > MAX_FILE_SIZE or len(image_bytes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file size.",
+        )
+
+    try:
+        result = analyze_medical_image(image_bytes, description)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Analysis failed: {str(exc)}",
+        )
+
+    return MediScanResponse(
+        scan_id="test_run",
+        disease=result["disease"],
+        confidence=result["confidence"],
+        severity=result["severity"],
+        is_critical=result["is_critical"],
+        top5=[MediScanPrediction(**p) for p in result["top5"]],
+        gradcam_image=result["gradcam_image"],
+        clinical_info=result["clinical_info"],
+        recommendations=result["recommendations"],
+        warning_signs=result["warning_signs"],
+        medications=result["medications"],
+        disclaimer=result["disclaimer"],
+    )
