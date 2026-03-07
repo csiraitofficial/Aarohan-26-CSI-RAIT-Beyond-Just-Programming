@@ -45,3 +45,6 @@ Thumbs.db
 build/
 coverage/
 *.log
+
+# ===== Machine Learning Models =====
+*.h5

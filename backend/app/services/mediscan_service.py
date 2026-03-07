@@ -25,25 +25,8 @@ from app.services.disease_mapper import (
 
 logger = logging.getLogger(__name__)
 
-# ─── TFLite Runtime Import (cascading fallback) ─────────────────
-try:
-    from ai_edge_litert import interpreter as tflite
-    logger.info("MediScan: Using ai-edge-litert")
-except ImportError:
-    try:
-        import tflite_runtime.interpreter as tflite
-        logger.info("MediScan: Using tflite_runtime")
-    except ImportError:
-        try:
-            import tensorflow as tf
-            tflite = tf.lite
-            logger.info("MediScan: Using tf.lite fallback")
-        except ImportError:
-            tflite = None
-            logger.warning(
-                "MediScan: No TFLite runtime found! "
-                "Install ai-edge-litert, tflite-runtime, or tensorflow."
-            )
+import glob
+import tensorflow as tf
 
 # ─── Gemini Import ──────────────────────────────────────────────
 try:
@@ -59,55 +42,51 @@ except Exception:
     GEMINI_AVAILABLE = False
 
 # ─── Global Model State ────────────────────────────────────────
-_interpreter = None
-_input_details = None
-_output_details = None
+_models = []
 _model_ready = False
 _model_error: Optional[str] = None
 
 
 # ─── Model Loading ──────────────────────────────────────────────
 def load_mediscan_model():
-    """Load TFLite model at startup."""
-    global _interpreter, _input_details, _output_details, _model_ready, _model_error
-
-    if tflite is None:
-        _model_error = "No TFLite runtime installed"
-        logger.error(f"MediScan model load failed: {_model_error}")
-        return
+    """Load all Keras .h5 models into an ensemble at startup."""
+    global _models, _model_ready, _model_error
 
     start = time.time()
-    logger.info("MediScan: Loading TFLite model...")
+    logger.info("MediScan: Loading Keras models for ensemble...")
 
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(
-            base_dir, "..", "..", "mediscan_models",
-            "chest_disease_efficientnetv2.tflite",
-        )
-        model_path = os.path.normpath(model_path)
+        models_dir = os.path.join(base_dir, "..", "..", "mediscan_models")
+        model_paths = glob.glob(os.path.join(models_dir, "*.h5"))
+        
+        if not model_paths:
+            raise FileNotFoundError(f"No .h5 models found in {models_dir}")
 
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found: {model_path}")
-
-        _interpreter = tflite.Interpreter(model_path=model_path)
-        _interpreter.allocate_tensors()
-        _input_details = _interpreter.get_input_details()
-        _output_details = _interpreter.get_output_details()
+        for path in model_paths:
+            try:
+                # Load each model (suppressing verbose output)
+                logger.info(f"Loading {os.path.basename(path)}...")
+                model = tf.keras.models.load_model(path, compile=False)
+                _models.append(model)
+            except Exception as e:
+                logger.warning(f"Failed to load {os.path.basename(path)}: {e}")
+        
+        if not _models:
+            raise RuntimeError("None of the models could be loaded.")
 
         # Warm-up inference
         dummy = np.zeros((1, 224, 224, 3), dtype=np.float32)
-        _interpreter.set_tensor(_input_details[0]["index"], dummy)
-        _interpreter.invoke()
-        _ = _interpreter.get_tensor(_output_details[0]["index"])
+        for model in _models:
+            _ = model.predict(dummy, verbose=0)
 
         _model_ready = True
         elapsed = time.time() - start
-        logger.info(f"MediScan: Model loaded and warmed up in {elapsed:.2f}s")
+        logger.info(f"MediScan: {len(_models)} ensemble models loaded and warmed up in {elapsed:.2f}s")
 
     except Exception as exc:
         _model_error = str(exc)
-        _interpreter = None
+        _models = []
         logger.error(f"MediScan model load failed: {_model_error}")
 
 
@@ -139,32 +118,54 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
 # ─── TFLite Inference ──────────────────────────────────────────
 def predict_disease(image_bytes: bytes) -> dict:
     """
-    Run TFLite inference on a medical image.
+    Run Keras ensemble inference on a medical image.
     Returns: {
         disease, confidence, class_index,
         top5: [{disease, confidence, class_index}, ...]
     }
     """
-    if not _model_ready or _interpreter is None:
-        raise RuntimeError("MediScan model is not loaded")
+    if not _model_ready or not _models:
+        raise RuntimeError("MediScan ensemble is not loaded")
 
     processed = preprocess_image(image_bytes)
 
-    _interpreter.set_tensor(_input_details[0]["index"], processed)
-    _interpreter.invoke()
-    predictions = _interpreter.get_tensor(_output_details[0]["index"])[0]
+    # Average predictions from all models
+    all_preds = []
+    for model in _models:
+        raw_preds = model.predict(processed, verbose=0)
+        if isinstance(raw_preds, list) or isinstance(raw_preds, tuple):
+            raw_preds = raw_preds[0]
+            
+        preds = np.array(raw_preds).flatten()
+        if preds.shape[0] < 8:
+            continue
+            
+        # Align all models to the first 8 core diseases
+        preds = preds[:8]
+        sum_preds = np.sum(preds)
+        if sum_preds > 0:
+            preds = preds / sum_preds
+        all_preds.append(preds)
+
+    # Convert to numpy array and calculate mean across ensemble models
+    try:
+        avg_predictions = np.mean(all_preds, axis=0)
+    except Exception as e:
+        logger.error(f"Failed np.mean: {e}")
+        logger.error(f"all_preds shapes: {[np.array(p).shape for p in all_preds]}")
+        raise
 
     # Primary prediction
-    class_idx = int(np.argmax(predictions))
-    confidence = float(predictions[class_idx]) * 100
+    class_idx = int(np.argmax(avg_predictions))
+    confidence = float(avg_predictions[class_idx]) * 100
     disease = get_disease_name(class_idx)
 
     # Top-5 predictions
-    top5_indices = np.argsort(predictions)[::-1][:5]
+    top5_indices = np.argsort(avg_predictions)[::-1][:5]
     top5 = [
         {
             "disease": get_disease_name(int(i)),
-            "confidence": round(float(predictions[i]) * 100, 2),
+            "confidence": round(float(avg_predictions[i]) * 100, 2),
             "class_index": int(i),
         }
         for i in top5_indices
