@@ -11,7 +11,7 @@ python-multipart==0.0.12
 alembic==1.13.3
 python-dotenv==1.0.1
 httpx==0.27.2
-supabase>=2.0.0
+firebase-admin>=6.0.0
 slowapi==0.1.9
 
 # LangGraph AI Agent Pipeline

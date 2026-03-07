@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useReducer } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
 import {
   AIClassification,
   CaseRecord,
@@ -8,6 +8,8 @@ import {
   SymptomEntry,
   VitalsData,
 } from '../models';
+import { useAuth } from './AuthContext';
+import { fetchProfile } from '../services/api';
 
 /* ─── state ─── */
 interface PatientState {
@@ -35,11 +37,11 @@ const emptyEntry: SymptomEntry = {
 };
 
 const defaultProfile: PatientProfile = {
-  name: 'Priya Sharma',
-  age: 34,
-  gender: 'Female',
+  name: '',
+  age: 0,
+  gender: '',
   language: 'en',
-  emergencyContact: '+91 98765 43210',
+  emergencyContact: '',
   medicalHistory: 'No known conditions',
   allergies: [],
 };
@@ -192,8 +194,41 @@ interface PatientContextValue extends PatientState {
 
 const PatientContext = createContext<PatientContextValue | undefined>(undefined);
 
+function calculateAge(dob: string): number {
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 export const PatientProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { token, fullName, role } = useAuth();
+
+  // Sync profile from backend when token is available
+  useEffect(() => {
+    if (!token) return;
+    fetchProfile(token)
+      .then((user) => {
+        dispatch({
+          type: 'UPDATE_PROFILE',
+          payload: {
+            name: user.full_name || '',
+            gender: user.gender || '',
+            language: user.language_preference || 'en',
+            age: user.date_of_birth ? calculateAge(user.date_of_birth) : 0,
+          },
+        });
+      })
+      .catch(() => {
+        // Fallback: at least use the name from AuthContext
+        if (fullName) {
+          dispatch({ type: 'UPDATE_PROFILE', payload: { name: fullName } });
+        }
+      });
+  }, [token, fullName]);
 
   const updateEntry = useCallback((d: Partial<SymptomEntry>) => dispatch({ type: 'UPDATE_ENTRY', payload: d }), []);
   const resetEntry = useCallback(() => dispatch({ type: 'RESET_ENTRY' }), []);

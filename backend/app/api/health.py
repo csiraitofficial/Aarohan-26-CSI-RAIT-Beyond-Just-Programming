@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from app.db.database import get_db
 from app.core.config import settings
-from app.services import supabase_service
+from app.services import firebase_service
 
 router = APIRouter()
 
@@ -39,7 +39,7 @@ def health_check(db: Session = Depends(get_db)):
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "database": db_status,
-        "supabase": "configured" if supabase_service.is_configured() else "not_configured",
+        "firebase": "configured" if firebase_service.is_configured() else "not_configured",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

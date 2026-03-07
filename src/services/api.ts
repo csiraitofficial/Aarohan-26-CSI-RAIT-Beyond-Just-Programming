@@ -2,27 +2,38 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 // Computes the backend URL lazily (called on first request, not at import time).
-// This ensures Constants is fully initialized before we read debuggerHost.
+// Priority: app.json extra.BACKEND_URL > debuggerHost LAN IP > hardcoded fallback
 let _baseUrl: string | null = null;
 export function getBaseUrl(): string {
   if (_baseUrl) return _baseUrl;
+
+  // 1. Check for explicit config in app.json > expo > extra
+  const configUrl: string | undefined = Constants.expoConfig?.extra?.BACKEND_URL;
+  if (configUrl) {
+    _baseUrl = configUrl.replace(/\/+$/, ''); // trim trailing slash
+    return _baseUrl;
+  }
+
+  // 2. Web defaults to localhost
   if (Platform.OS === 'web') {
     _baseUrl = 'http://localhost:8000';
     return _baseUrl;
   }
-  // Try Expo SDK 49+ path first, then legacy manifest path
+
+  // 3. Auto-detect from Expo debuggerHost (works in LAN mode)
   const debuggerHost: string | undefined =
     (Constants.expoGoConfig as any)?.debuggerHost ??
     (Constants as any).manifest2?.debuggerHost ??
     (Constants as any).manifest?.debuggerHost;
   if (debuggerHost) {
     const ip = debuggerHost.split(':')[0];
-    // Only use a numeric LAN IP — ignore tunnel hostnames
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
       _baseUrl = `http://${ip}:8000`;
       return _baseUrl;
     }
   }
+
+  // 4. Hardcoded fallback
   _baseUrl = 'http://192.168.137.192:8000';
   return _baseUrl;
 }
@@ -33,7 +44,7 @@ type RequestOptions = {
   token?: string;
 };
 
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = 15000;
 
 function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   return Promise.race([
@@ -102,6 +113,21 @@ export interface AuthResponse {
     phone: string;
     email?: string;
     role: string;
+    language_preference?: string;
+    date_of_birth?: string;
+    gender?: string;
+    address?: string;
+    is_active: boolean;
+    doctor_profile?: {
+      license_number: string;
+      specialization?: string;
+      hospital_name?: string;
+      years_of_experience?: number;
+    };
+    chw_profile?: {
+      worker_id: string;
+      assigned_district?: string;
+    };
   };
 }
 
@@ -113,6 +139,16 @@ export interface RegisterData {
   role?: string;
   gender?: string;
   date_of_birth?: string;
+  language_preference?: string;
+  address?: string;
+  // Doctor-specific
+  license_number?: string;
+  specialization?: string;
+  hospital_name?: string;
+  years_of_experience?: number;
+  // CHW-specific
+  worker_id?: string;
+  assigned_district?: string;
 }
 
 export interface LoginData {
@@ -131,6 +167,27 @@ export async function login(data: LoginData): Promise<AuthResponse> {
   return apiRequest<AuthResponse>('/api/auth/login', {
     method: 'POST',
     body: data,
+  });
+}
+
+export async function fetchProfile(token: string): Promise<AuthResponse['user']> {
+  return apiRequest<AuthResponse['user']>('/api/auth/me', { token });
+}
+
+export interface UpdateProfileData {
+  full_name?: string;
+  email?: string;
+  language_preference?: string;
+  date_of_birth?: string;
+  gender?: string;
+  address?: string;
+}
+
+export async function updateProfileApi(data: UpdateProfileData, token: string): Promise<AuthResponse['user']> {
+  return apiRequest<AuthResponse['user']>('/api/auth/me', {
+    method: 'PUT',
+    body: data,
+    token,
   });
 }
 

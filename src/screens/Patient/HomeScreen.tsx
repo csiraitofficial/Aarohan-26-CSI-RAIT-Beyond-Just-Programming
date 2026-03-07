@@ -74,7 +74,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.appName}>Swasthya Saathi</Text>
-          <Text style={styles.greeting}>Hello, {profile.name.split(' ')[0]}</Text>
+          <Text style={styles.greeting}>Hello, {(profile.name || 'User').split(' ')[0]}</Text>
         </View>
         <View style={styles.headerRight}>
           <Pressable

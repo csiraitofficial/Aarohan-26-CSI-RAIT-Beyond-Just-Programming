@@ -81,6 +81,38 @@ class User(Base):
     # Relationships
     health_records = relationship("HealthRecord", back_populates="user", cascade="all, delete-orphan")
     consultations = relationship("ConsultationSession", back_populates="user", cascade="all, delete-orphan")
+    doctor_profile = relationship("DoctorProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    chw_profile = relationship("CHWProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
+
+class DoctorProfile(Base):
+    """Extended profile for users with role=doctor."""
+
+    __tablename__ = "doctor_profiles"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
+    license_number = Column(String(100), nullable=False)
+    specialization = Column(String(255), nullable=True)
+    hospital_name = Column(String(255), nullable=True)
+    years_of_experience = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    user = relationship("User", back_populates="doctor_profile")
+
+
+class CHWProfile(Base):
+    """Extended profile for users with role=chw (Community Health Worker)."""
+
+    __tablename__ = "chw_profiles"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
+    worker_id = Column(String(100), nullable=False)
+    assigned_district = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    user = relationship("User", back_populates="chw_profile")
 
 
 class HealthRecord(Base):

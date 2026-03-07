@@ -1,158 +1,161 @@
-"""
-Authentication API endpoints: register, login, profile.
-Supabase Auth is the primary credential store.
-Local SQLite mirrors user data for app queries (relations, consultations, etc.).
-"""
+"""Authentication API endpoints: register, login, profile — backed by Firestore."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from typing import Optional, Dict, Any
 
-from typing import Optional
-
-from app.db.database import get_db
-from app.models.models import User, UserRole
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse, UserUpdate
 from app.core.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.services import supabase_service
+from app.services import firebase_auth_service as fb
 
 router = APIRouter()
 
+VALID_ROLES = {"patient", "doctor", "chw", "admin"}
 
-def _resolve_role(raw: Optional[str]) -> UserRole:
-    role_str = (raw or "PATIENT").upper()
-    try:
-        return UserRole(role_str.lower())
-    except ValueError:
-        return UserRole.PATIENT
+
+def _resolve_role(raw: Optional[str]) -> str:
+    role = (raw or "patient").lower()
+    return role if role in VALID_ROLES else "patient"
+
+
+def _user_to_response(user: Dict[str, Any]) -> UserResponse:
+    """Convert a Firestore user dict to a UserResponse, attaching role profiles."""
+    uid = user["id"]
+    doctor_profile = None
+    chw_profile = None
+    if user.get("role") == "doctor":
+        doctor_profile = fb.get_doctor_profile(uid)
+    elif user.get("role") == "chw":
+        chw_profile = fb.get_chw_profile(uid)
+    return UserResponse(
+        id=uid,
+        full_name=user["full_name"],
+        phone=user["phone"],
+        email=user.get("email"),
+        role=user.get("role", "patient"),
+        language_preference=user.get("language_preference", "en"),
+        date_of_birth=user.get("date_of_birth"),
+        gender=user.get("gender"),
+        address=user.get("address"),
+        is_active=user.get("is_active", True),
+        doctor_profile=doctor_profile,
+        chw_profile=chw_profile,
+    )
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user. Credentials stored in Supabase, profile mirrored locally."""
+def register(user_data: UserCreate):
+    """Register a new user — stored in Firestore."""
 
-    # 1. Register in Supabase (primary)
-    ok, result = supabase_service.register_user(
-        phone=user_data.phone,
-        password=user_data.password,
-        full_name=user_data.full_name,
-        role=user_data.role or "PATIENT",
-    )
-    if not ok:
-        # If Supabase says "already registered" but user doesn't exist locally,
-        # allow local creation (re-sync scenario after DB wipe).
-        if "already" not in (result or "").lower():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
-        if db.query(User).filter(User.phone == user_data.phone).first():
+    user_role = _resolve_role(user_data.role)
+
+    # Validate role-specific required fields
+    if user_role == "doctor":
+        if not user_data.license_number:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Phone number already registered",
+                detail="License number is required for doctor registration",
+            )
+    elif user_role == "chw":
+        if not user_data.worker_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Worker ID is required for CHW registration",
             )
 
-    # 2. Check local duplicate (safety net)
-    existing = db.query(User).filter(User.phone == user_data.phone).first()
-    if existing:
+    # Check duplicate phone
+    if fb.get_user_by_phone(user_data.phone):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Phone number already registered",
         )
-    if user_data.email:
-        if db.query(User).filter(User.email == user_data.email).first():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered",
-            )
 
-    # 3. Mirror to local SQLite
-    user_role = _resolve_role(user_data.role)
-    new_user = User(
-        full_name=user_data.full_name,
-        phone=user_data.phone,
-        email=user_data.email,
-        hashed_password=hash_password(user_data.password),
-        role=user_role,
-        language_preference=user_data.language_preference or "en",
-        date_of_birth=user_data.date_of_birth,
-        gender=user_data.gender,
-        address=user_data.address,
-        latitude=user_data.latitude,
-        longitude=user_data.longitude,
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    # Create user in Firestore
+    new_user = fb.create_user({
+        "full_name": user_data.full_name,
+        "phone": user_data.phone,
+        "email": user_data.email,
+        "hashed_password": hash_password(user_data.password),
+        "role": user_role,
+        "language_preference": user_data.language_preference or "en",
+        "date_of_birth": user_data.date_of_birth,
+        "gender": user_data.gender,
+        "address": user_data.address,
+        "latitude": user_data.latitude,
+        "longitude": user_data.longitude,
+    })
 
-    access_token = create_access_token(data={"sub": new_user.id})
-    return TokenResponse(access_token=access_token, user=UserResponse.model_validate(new_user))
+    uid = new_user["id"]
+
+    # Create role-specific profile
+    if user_role == "doctor":
+        fb.create_doctor_profile(uid, {
+            "license_number": user_data.license_number,
+            "specialization": user_data.specialization,
+            "hospital_name": user_data.hospital_name,
+            "years_of_experience": user_data.years_of_experience,
+        })
+    elif user_role == "chw":
+        fb.create_chw_profile(uid, {
+            "worker_id": user_data.worker_id,
+            "assigned_district": user_data.assigned_district,
+        })
+
+    access_token = create_access_token(data={"sub": uid})
+    return TokenResponse(access_token=access_token, user=_user_to_response(new_user))
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
-    """Login — verify against Supabase first, then local."""
-
-    # 1. Verify via Supabase
-    supa_ok, supa_err = supabase_service.verify_login(credentials.phone, credentials.password)
-    if not supa_ok:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=supa_err or "Invalid phone number or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # 2. Fetch local user record (needed for app JWT + profile data)
-    user = db.query(User).filter(User.phone == credentials.phone).first()
+def login(credentials: UserLogin):
+    """Login with phone and password — verified against Firestore."""
+    user = fb.get_user_by_phone(credentials.phone)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found. Please register first.",
+            detail="Invalid phone number or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    # 3. Local password check as fallback (handles Supabase-unavailable case
-    #    where verify_login returns (True, None) without actually checking)
-    if not verify_password(credentials.password, user.hashed_password):
+    if not verify_password(credentials.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid phone number or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    if not user.is_active:
+    if not user.get("is_active", True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
 
-    access_token = create_access_token(data={"sub": user.id})
-    return TokenResponse(access_token=access_token, user=UserResponse.model_validate(user))
+    access_token = create_access_token(data={"sub": user["id"]})
+    return TokenResponse(access_token=access_token, user=_user_to_response(user))
 
 
 @router.post("/token")
-def token_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def token_login(form_data: OAuth2PasswordRequestForm = Depends()):
     """OAuth2-compatible token endpoint for Swagger UI."""
-    user = db.query(User).filter(User.phone == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    user = fb.get_user_by_phone(form_data.username)
+    if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid phone number or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not user.is_active:
+    if not user.get("is_active", True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
-    access_token = create_access_token(data={"sub": user.id})
+    access_token = create_access_token(data={"sub": user["id"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=UserResponse)
-def get_profile(current_user: User = Depends(get_current_user)):
-    return UserResponse.model_validate(current_user)
+def get_profile(current_user: dict = Depends(get_current_user)):
+    return _user_to_response(current_user)
 
 
 @router.put("/me", response_model=UserResponse)
 def update_profile(
     updates: UserUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
-    for field, value in updates.model_dump(exclude_unset=True).items():
-        setattr(current_user, field, value)
-    db.commit()
-    db.refresh(current_user)
-    return UserResponse.model_validate(current_user)
+    fields = updates.model_dump(exclude_unset=True)
+    if not fields:
+        return _user_to_response(current_user)
+    updated = fb.update_user(current_user["id"], fields)
+    return _user_to_response(updated)
