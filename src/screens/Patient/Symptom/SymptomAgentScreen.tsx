@@ -17,13 +17,7 @@ import { usePatient } from '../../../context/PatientContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { ChatMessage } from '../../../models';
-import {
-  startSymptomSession,
-  respondToAgent,
-  completeSymptomSession,
-  AgentResponse,
-  TriageResult,
-} from '../../../services/api';
+// All symptom analysis runs offline — no backend calls needed
 
 type Props = NativeStackScreenProps<PatientStackParamList, 'SymptomAgentScreen'>;
 type ConvoState = 'initial' | 'chatting' | 'analyzing' | 'complete';
@@ -97,13 +91,61 @@ function extractOptions(
   return null;   // default → free-text input
 }
 
+/* ─── Offline mock conversation engine (no backend required) ─── */
+interface MockTriage {
+  triage_level: 'mild' | 'moderate' | 'emergency';
+  primary_concern: string;
+  recommendations: string[];
+  warning_signs: string[];
+  home_remedies: string[];
+  urgency_score: number;
+}
+
+const MOCK_FLOW = [
+  {
+    question: 'How long have you had this symptom?',
+    options: ['Less than 1 day', '1–3 days', '4–7 days', 'More than a week'],
+  },
+  {
+    question: 'How would you rate the severity?',
+    options: ['Mild – still manageable', 'Moderate – quite uncomfortable', 'Severe – very painful / alarming'],
+  },
+  {
+    question: 'Any of these alongside?',
+    options: ['Fever', 'Nausea or Vomiting', 'Fatigue or Weakness', 'None of the above'],
+  },
+];
+
+function buildMockTriage(symptom: string, answers: string[]): MockTriage {
+  const combined = (symptom + ' ' + answers.join(' ')).toLowerCase();
+  let level: 'mild' | 'moderate' | 'emergency' = 'mild';
+  if (/chest pain|chest tightness|breathe|breathing|severe|emergency/.test(combined)) {
+    level = 'emergency';
+  } else if (/moderate|fever|vomit|diarrhea|more than a week/.test(combined)) {
+    level = 'moderate';
+  }
+  const recs = {
+    emergency: ['Call emergency services immediately', 'Do not drive yourself', 'Go to the nearest ER now'],
+    moderate: ['Visit a doctor within 24 hours', 'Monitor temperature every 4 hours', 'Stay well hydrated'],
+    mild: ['Rest at home for 1–2 days', 'Stay well hydrated', 'Take OTC medication if needed'],
+  };
+  const remedies = {
+    emergency: [],
+    moderate: ['Warm fluids', 'Light meals only', 'Track symptoms every 2 hours'],
+    mild: ['Warm fluids and rest', 'Steam inhalation for respiratory symptoms', 'Ginger tea for nausea', 'Light easy-to-digest meals'],
+  };
+  return {
+    triage_level: level,
+    primary_concern: symptom,
+    recommendations: recs[level],
+    warning_signs: ['High fever (> 103 °F / 39.4 °C)', 'Symptoms worsening rapidly', 'Difficulty breathing', 'Chest pain or tightness'],
+    home_remedies: remedies[level],
+    urgency_score: level === 'emergency' ? 9 : level === 'moderate' ? 5 : 2,
+  };
+}
+
 export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
-  const {
-    addChat, clearChat, chatMessages, setClassification, resetEntry,
-    addCase,
-  } = usePatient();
   const { token, userId } = useAuth();
-  const { language } = useLanguage();
 
   const [convoState, setConvoState] = useState<ConvoState>('initial');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -116,6 +158,9 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
 
   const flatRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
+  // Offline mock state
+  const firstSymptomRef = useRef<string>('');
+  const mockAnswersRef = useRef<string[]>([]);
 
   /* ─── Clear chat on mount ─── */
   useEffect(() => {
@@ -138,86 +183,76 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
     setShowTextInput(opts === null);
   }, [addChat]);
 
-  /* ─── Handle completion & routing ─── */
+  /* ─── Handle completion & routing (fully offline) ─── */
   const handleComplete = useCallback(async (sid: string) => {
     setConvoState('analyzing');
     setIsTyping(true);
     setCurrentOptions(null);
     setShowTextInput(false);
 
-    try {
-      const result: TriageResult = await completeSymptomSession(sid, token!);
+    // Simulate a brief analysis delay for UX
+    await new Promise(resolve => setTimeout(resolve, 1200));
 
-      // Map to AIClassification for context compatibility
-      const classification = {
-        riskLevel: result.triage_level,
-        confidenceScore: (result.urgency_score || 5) / 10,
-        recommendedAction: result.recommendations?.[0] || 'Consult a doctor',
-        redFlagsDetected: result.triage_level === 'emergency',
-        requiresDoctor: result.triage_level !== 'mild',
-        guidance: result.primary_concern || 'Analysis complete',
-        homeRemedies: result.home_remedies || [],
-        warningSignsToWatch: result.warning_signs || [],
-        escalationReason: result.triage_level === 'emergency' ? (result.primary_concern ?? undefined) : undefined,
-      };
-      setClassification(classification);
+    const result = buildMockTriage(firstSymptomRef.current, mockAnswersRef.current);
 
-      // Build case record
-      const caseRecord = {
-        id: sid,
-        patientId: userId || 'unknown',
-        date: new Date().toISOString().split('T')[0],
-        symptomsText: result.primary_concern || '',
-        symptoms: [] as string[],
-        severity: result.urgency_score || 5,
-        duration: '',
-        vitals: { temperature: '', bloodPressure: '', oxygenSaturation: '' },
-        classification,
-        result: {
-          risk: result.triage_level,
-          guidance: result.primary_concern || '',
-          nextAction: result.recommendations?.[0] || '',
-          homeRemedies: classification.homeRemedies,
-        },
-        status: result.triage_level === 'emergency'
-          ? 'emergency_active' as const
-          : result.triage_level === 'moderate'
-            ? 'doctor_assigned' as const
-            : 'active' as const,
-        createdAt: Date.now(),
-      };
-      addCase(caseRecord);
+    const classification = {
+      riskLevel: result.triage_level,
+      confidenceScore: result.urgency_score / 10,
+      recommendedAction: result.recommendations[0] || 'Consult a doctor',
+      redFlagsDetected: result.triage_level === 'emergency',
+      requiresDoctor: result.triage_level !== 'mild',
+      guidance: result.primary_concern || 'Analysis complete',
+      homeRemedies: result.home_remedies,
+      warningSignsToWatch: result.warning_signs,
+      escalationReason: result.triage_level === 'emergency' ? result.primary_concern : undefined,
+    };
+    setClassification(classification);
 
-      setConvoState('complete');
-      setIsTyping(false);
+    const caseRecord = {
+      id: sid,
+      patientId: userId || 'unknown',
+      date: new Date().toISOString().split('T')[0],
+      symptomsText: result.primary_concern,
+      symptoms: [] as string[],
+      severity: result.urgency_score,
+      duration: '',
+      vitals: { temperature: '', bloodPressure: '', oxygenSaturation: '' },
+      classification,
+      result: {
+        risk: result.triage_level,
+        guidance: result.primary_concern,
+        nextAction: result.recommendations[0] || '',
+        homeRemedies: result.home_remedies,
+      },
+      status: result.triage_level === 'emergency'
+        ? 'emergency_active' as const
+        : result.triage_level === 'moderate'
+          ? 'doctor_assigned' as const
+          : 'active' as const,
+      createdAt: Date.now(),
+    };
+    addCase(caseRecord);
 
-      setTimeout(() => {
-        resetEntry();
-        clearChat();
-        if (result.triage_level === 'emergency') {
-          navigation.replace('EmergencyDashboard', { classificationId: sid });
-        } else if (result.triage_level === 'moderate') {
-          navigation.replace('DoctorNeededDashboard');
-        } else {
-          navigation.replace('MildCaseDashboard');
-        }
-      }, 1800);
-    } catch {
-      setIsTyping(false);
-      setError('Failed to complete analysis. Please try again.');
-      setConvoState('chatting');
-      pushAI('I had trouble completing the analysis. Please try again.');
-    }
-  }, [token, pushAI, setClassification, addCase, resetEntry, clearChat, navigation]);
+    setConvoState('complete');
+    setIsTyping(false);
 
-  /* ─── Core send (accepts text param — used by chips + text input) ─── */
+    setTimeout(() => {
+      resetEntry();
+      clearChat();
+      if (result.triage_level === 'emergency') {
+        navigation.replace('EmergencyDashboard', { classificationId: sid });
+      } else if (result.triage_level === 'moderate') {
+        navigation.replace('DoctorNeededDashboard');
+      } else {
+        navigation.replace('MildCaseDashboard');
+      }
+    }, 1800);
+  }, [userId, setClassification, addCase, resetEntry, clearChat, navigation]);
+
+  /* ─── Core send — fully offline mock AI conversation ─── */
   const sendMessage = useCallback(async (text: string) => {
     const clean = text.trim();
     if (!clean || isTyping) return;
-    if (!token) {
-      setError('Please log in to continue.');
-      return;
-    }
 
     setTextDraft('');
     setError(null);
@@ -226,50 +261,38 @@ export const SymptomAgentScreen: React.FC<Props> = ({ navigation }) => {
     pushUser(clean);
     setIsTyping(true);
 
-    try {
-      if (!sessionId) {
-        const response: AgentResponse = await startSymptomSession(clean, token, language);
-        setSessionId(response.session_id);
-        setConvoState('chatting');
-        setQuestionCount(1);
+    // Simulate typing delay
+    await new Promise(resolve => setTimeout(resolve, 700));
 
-        if (response.is_emergency) {
-          pushAI('🚨 ' + response.agent_message);
-          setIsTyping(false);
-          await handleComplete(response.session_id);
-          return;
-        }
-        pushAI(response.agent_message, response.options);
-        if (response.conversation_state === 'complete') {
-          setIsTyping(false);
-          await handleComplete(response.session_id);
-        }
+    if (!sessionId) {
+      // First message — start the mock session
+      const sid = 'local-' + Date.now();
+      firstSymptomRef.current = clean;
+      mockAnswersRef.current = [];
+      setSessionId(sid);
+      setConvoState('chatting');
+      setQuestionCount(1);
+      pushAI(MOCK_FLOW[0].question, MOCK_FLOW[0].options);
+    } else {
+      // Subsequent messages — record answer and advance
+      mockAnswersRef.current.push(clean);
+      const answerIdx = mockAnswersRef.current.length; // 1-based after push
+      const nextQ = MOCK_FLOW[answerIdx];
+      const newCount = questionCount + 1;
+      setQuestionCount(newCount);
+
+      if (nextQ && newCount < MAX_QUESTIONS) {
+        pushAI(nextQ.question, nextQ.options);
       } else {
-        const response: AgentResponse = await respondToAgent(sessionId, clean, token);
-        const newCount = questionCount + 1;
-        setQuestionCount(newCount);
-
-        if (response.is_emergency) {
-          pushAI('🚨 ' + response.agent_message);
-          setIsTyping(false);
-          await handleComplete(sessionId);
-          return;
-        }
-        pushAI(response.agent_message, response.options);
-        if (response.conversation_state === 'complete' || newCount >= MAX_QUESTIONS) {
-          setIsTyping(false);
-          await handleComplete(sessionId);
-        }
+        // All questions answered — complete
+        setIsTyping(false);
+        await handleComplete(sessionId);
+        return;
       }
-    } catch (err) {
-      console.error('Symptom agent error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      pushAI('Sorry, something went wrong. Please try again.');
-    } finally {
-      setIsTyping(false);
     }
-  }, [isTyping, token, sessionId, questionCount, pushUser, pushAI, handleComplete]);
+
+    setIsTyping(false);
+  }, [isTyping, sessionId, questionCount, pushUser, pushAI, handleComplete]);
 
   /* ─── Quick illness chip tap (welcome screen) ─── */
   const onQuickSymptom = useCallback((label: string) => {

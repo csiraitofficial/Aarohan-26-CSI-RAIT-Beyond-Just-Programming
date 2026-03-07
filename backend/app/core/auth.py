@@ -3,17 +3,14 @@ Authentication utilities: password hashing, JWT token creation/validation.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import bcrypt as _bcrypt
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.database import get_db
-from app.models.models import User
 
 # OAuth2 scheme for JWT bearer tokens
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -64,12 +61,13 @@ def decode_access_token(token: str) -> dict:
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> User:
+) -> Dict[str, Any]:
     """
     FastAPI dependency: extracts and validates the current user from JWT token.
-    Use as a dependency in protected endpoints.
+    Fetches user data from Firestore.
     """
+    from app.services import firebase_auth_service as fb
+
     payload = decode_access_token(token)
     user_id: str = payload.get("sub")
     if user_id is None:
@@ -79,13 +77,13 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = fb.get_user_by_id(user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    if not user.is_active:
+    if not user.get("is_active", True):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated",

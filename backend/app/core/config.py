@@ -17,10 +17,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./swasthya_saathi.db"
 
-    # Supabase
-    SUPABASE_URL: str = ""
-    SUPABASE_ANON_KEY: str = ""
-    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    # Firebase
+    FIREBASE_CREDENTIALS_PATH: str = ""
+    FIREBASE_PROJECT_ID: str = ""
 
     # Google Gemini
     GEMINI_API_KEY: str = "your_gemini_api_key_here"

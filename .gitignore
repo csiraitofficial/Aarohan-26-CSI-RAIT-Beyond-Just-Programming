@@ -28,6 +28,9 @@ env/
 .env.local
 .env.*.local
 backend/.env
+backend/firebase-credentials.json
+backend/*-adminsdk-*.json
+*.json.key
 
 # ===== OS files =====
 .DS_Store
