@@ -1,28 +1,45 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Dynamically resolve the backend URL based on the current Expo Metro host.
-// Evaluated lazily on each request so NativeModules are fully populated at call time.
-// Works on any network without needing to hardcode IP addresses.
-let _cachedBaseUrl: string | null = null;
+// ── Backend URL resolution ──
+// Uses Expo Constants to reliably extract the dev server host IP,
+// then replaces the Metro port with the backend port (8000).
+const BACKEND_PORT = 8000;
 
 function getBaseUrl(): string {
-  // Return cached value if already successfully resolved to a real IP
-  if (_cachedBaseUrl && !_cachedBaseUrl.includes('localhost')) {
-    return _cachedBaseUrl;
-  }
-  // NativeModules.SourceCode.scriptURL contains the Metro bundler URL
-  // e.g. "http://192.168.x.x:8081/..." — extract host and replace port with 8000
+  // Strategy 1: expo-constants debuggerHost / expoConfig.hostUri (most reliable)
+  try {
+    const debuggerHost: string | undefined =
+      Constants.expoGoConfig?.debuggerHost ??
+      (Constants as any).manifest?.debuggerHost ??
+      (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ??
+      Constants.expoConfig?.hostUri ??
+      (Constants as any).manifest?.hostUri;
+    if (debuggerHost) {
+      const host = debuggerHost.split(':')[0];
+      if (host && host !== 'localhost' && host !== '127.0.0.1') {
+        return `http://${host}:${BACKEND_PORT}`;
+      }
+    }
+  } catch (_) {}
+
+  // Strategy 2: NativeModules.SourceCode.scriptURL
   try {
     const scriptURL: string = NativeModules?.SourceCode?.scriptURL ?? '';
     if (scriptURL) {
       const match = scriptURL.match(/https?:\/\/([^:/]+)/);
-      if (match && match[1] && match[1] !== 'localhost') {
-        _cachedBaseUrl = `http://${match[1]}:8000`;
-        return _cachedBaseUrl;
+      if (match && match[1] && match[1] !== 'localhost' && match[1] !== '127.0.0.1') {
+        return `http://${match[1]}:${BACKEND_PORT}`;
       }
     }
   } catch (_) {}
-  return 'http://localhost:8000';
+
+  // Strategy 3: Android emulator uses 10.0.2.2 to reach host localhost
+  if (Platform.OS === 'android') {
+    return `http://10.0.2.2:${BACKEND_PORT}`;
+  }
+
+  return `http://localhost:${BACKEND_PORT}`;
 }
 
 // HTTPS check disabled for local development
@@ -37,7 +54,10 @@ type RequestOptions = {
 };
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${getBaseUrl()}${path}`, {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}${path}`;
+  console.log(`[API] ${options.method ?? 'GET'} ${url}`);
+  const response = await fetch(url, {
     method: options.method ?? 'GET',
     headers: {
       'Content-Type': 'application/json',
