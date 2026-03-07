@@ -17,11 +17,19 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./swasthya_saathi.db"
 
+    # Supabase
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+
     # Google Gemini
     GEMINI_API_KEY: str = "your_gemini_api_key_here"
 
     # AssemblyAI Speech-to-Text
     ASSEMBLYAI_API_KEY: str = "your_assemblyai_api_key_here"
+
+    # Daily.co Video
+    DAILY_API_KEY: str = ""
 
     # JWT
     SECRET_KEY: str = "dev-secret-key-change-in-production"

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/types';
 import { EmergencyBanner } from '../../components/ui/EmergencyBanner';
@@ -41,15 +42,15 @@ export const EmergencyScreen: React.FC<Props> = ({ navigation }) => {
       </Card>
 
       <View style={styles.actions}>
-        <PrimaryButton title="📞 Call 112 (Emergency)" variant="danger" onPress={() => Linking.openURL('tel:112')} />
+        <PrimaryButton title="Call 112 (Emergency)" variant="danger" onPress={() => Linking.openURL('tel:112')} />
         <View style={{ height: 12 }} />
         <PrimaryButton
-          title={`📱 Call ${profile.emergencyContact}`}
+          title={`Call ${profile.emergencyContact}`}
           variant="danger"
           onPress={() => Linking.openURL(`tel:${profile.emergencyContact.replace(/\s/g, '')}`)}
         />
         <View style={{ height: 12 }} />
-        <PrimaryButton title="📍 Share My Location" variant="neutral" onPress={() => {}} />
+        <PrimaryButton title="Share My Location" variant="neutral" onPress={() => {}} />
         <View style={{ height: 24 }} />
         <Text style={styles.backLink} onPress={() => navigation.popToTop()}>← I'm okay, go back to Home</Text>
       </View>

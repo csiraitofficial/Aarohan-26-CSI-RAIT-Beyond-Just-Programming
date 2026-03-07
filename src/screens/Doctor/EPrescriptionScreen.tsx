@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../utils/theme';
 
 /* ─── Types ─── */
@@ -141,7 +142,7 @@ export const EPrescriptionScreen: React.FC = () => {
       <View style={styles.patientSummary}>
         <View style={styles.patientSummaryRow}>
           <View style={styles.patientSummaryAvatar}>
-            <Text style={{ fontSize: 22 }}>👨</Text>
+            <MaterialCommunityIcons name="account" size={22} color={theme.colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.patientSummaryName}>{PATIENT.name}</Text>
@@ -152,7 +153,7 @@ export const EPrescriptionScreen: React.FC = () => {
         </View>
         {PATIENT.allergies.length > 0 && (
           <View style={styles.allergyWarning}>
-            <Text style={{ fontSize: 14 }}>⚠️</Text>
+            <MaterialCommunityIcons name="alert-outline" size={14} color="#DC2626" />
             <Text style={styles.allergyWarningText}>
               Allergies: {PATIENT.allergies.join(', ')}
             </Text>
@@ -182,7 +183,9 @@ export const EPrescriptionScreen: React.FC = () => {
               ]}
             >
               <Text style={{ fontSize: 16 }}>
-                {w.severity === 'high' ? '🚫' : '⚠️'}
+                {w.severity === 'high'
+                  ? <MaterialCommunityIcons name="cancel" size={16} color="#DC2626" />
+                  : <MaterialCommunityIcons name="alert-outline" size={16} color="#D97706" />}
               </Text>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.warningDrug, { color: w.severity === 'high' ? '#DC2626' : '#D97706' }]}>
@@ -197,7 +200,7 @@ export const EPrescriptionScreen: React.FC = () => {
 
       {/* ─── Diagnosis ─── */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>🏥 Diagnosis</Text>
+        <Text style={styles.sectionLabel}><MaterialCommunityIcons name="hospital-building" size={14} color="#0F172A" /> Diagnosis</Text>
         <TextInput
           style={styles.textArea}
           value={diagnosis}
@@ -211,7 +214,7 @@ export const EPrescriptionScreen: React.FC = () => {
       {/* ─── Medications List ─── */}
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>💊 Medications ({medications.length})</Text>
+          <Text style={styles.sectionLabel}><MaterialCommunityIcons name="pill" size={14} color="#0F172A" /> Medications ({medications.length})</Text>
           <Pressable style={styles.addMedBtn} onPress={() => setShowAddMed(!showAddMed)}>
             <Text style={styles.addMedBtnText}>{showAddMed ? '✕ Cancel' : '+ Add Med'}</Text>
           </Pressable>
@@ -230,11 +233,11 @@ export const EPrescriptionScreen: React.FC = () => {
                 </Text>
               </View>
               <Pressable onPress={() => removeMedication(med.id)} style={styles.medRemoveBtn}>
-                <Text style={{ color: '#DC2626', fontSize: 14 }}>✕</Text>
+                <MaterialCommunityIcons name="close" size={14} color="#DC2626" />
               </Pressable>
             </View>
             <View style={styles.medListFooter}>
-              <Text style={styles.medListInstructions}>📝 {med.instructions}</Text>
+              <Text style={styles.medListInstructions}><MaterialCommunityIcons name="note-text-outline" size={11} color="#94A3B8" /> {med.instructions}</Text>
             </View>
           </View>
         ))}
@@ -344,7 +347,7 @@ export const EPrescriptionScreen: React.FC = () => {
 
       {/* ─── Clinical Notes ─── */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>📋 Clinical Notes</Text>
+        <Text style={styles.sectionLabel}><MaterialCommunityIcons name="clipboard-text-outline" size={14} color="#0F172A" /> Clinical Notes</Text>
         <TextInput
           style={[styles.textArea, { height: 80 }]}
           value={notes}
@@ -357,7 +360,7 @@ export const EPrescriptionScreen: React.FC = () => {
 
       {/* ─── Follow-up ─── */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>📅 Follow-up</Text>
+        <Text style={styles.sectionLabel}><MaterialCommunityIcons name="calendar-outline" size={14} color="#0F172A" /> Follow-up</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {['No follow-up', '3 days', '1 week', '2 weeks', '1 month'].map((f) => (
             <Pressable
@@ -376,18 +379,18 @@ export const EPrescriptionScreen: React.FC = () => {
       {/* ─── Actions ─── */}
       <View style={styles.actionSection}>
         <Pressable style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.actionBtnIcon}>📤</Text>
+          <Text style={styles.actionBtnIcon}><MaterialCommunityIcons name="send-outline" size={18} color="#FFF" /></Text>
           <Text style={styles.actionBtnText}>Send to Patient</Text>
         </Pressable>
         <View style={styles.actionRow}>
           <Pressable style={[styles.actionBtnSmall, { backgroundColor: '#059669' }]}>
-            <Text style={styles.actionBtnSmallText}>📥 Save Draft</Text>
+            <Text style={styles.actionBtnSmallText}><MaterialCommunityIcons name="content-save-outline" size={12} color="#FFF" /> Save Draft</Text>
           </Pressable>
           <Pressable style={[styles.actionBtnSmall, { backgroundColor: '#374151' }]}>
-            <Text style={styles.actionBtnSmallText}>🖨 Print</Text>
+            <Text style={styles.actionBtnSmallText}><MaterialCommunityIcons name="printer-outline" size={12} color="#FFF" /> Print</Text>
           </Pressable>
           <Pressable style={[styles.actionBtnSmall, { backgroundColor: '#7C3AED' }]}>
-            <Text style={styles.actionBtnSmallText}>📑 PDF</Text>
+            <Text style={styles.actionBtnSmallText}><MaterialCommunityIcons name="file-pdf-box" size={12} color="#FFF" /> PDF</Text>
           </Pressable>
         </View>
       </View>

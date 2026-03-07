@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,13 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../utils/theme';
+import { useAuth } from '../../context/AuthContext';
+import { createVideoRoom } from '../../services/api';
+import { DoctorStackParamList } from '../../navigation/DoctorTabNavigator';
 
 /* ─── Types ─── */
 interface ChatMsg {
@@ -36,7 +43,7 @@ const INITIAL_MESSAGES: ChatMsg[] = [
   { id: '2', sender: 'patient', text: 'Doctor, I have been having chest pain for the last 2 hours. It feels tight and heavy.', timestamp: '10:24 AM' },
   { id: '3', sender: 'doctor', text: 'I can see your vitals. Your oxygen level is concerning at 89%. Can you describe if the pain radiates to your arm or jaw?', timestamp: '10:25 AM' },
   { id: '4', sender: 'patient', text: 'Yes, I feel some pain going to my left arm. I am also sweating a lot.', timestamp: '10:26 AM' },
-  { id: '5', sender: 'system', text: '⚠️ AI Alert: Symptoms are consistent with possible ACS. Immediate ECG recommended.', timestamp: '10:26 AM' },
+  { id: '5', sender: 'system', text: 'AI Alert: Symptoms are consistent with possible ACS. Immediate ECG recommended.', timestamp: '10:26 AM' },
 ];
 
 const QUICK_RESPONSES = [
@@ -51,7 +58,30 @@ export const LiveConsultationScreen: React.FC = () => {
   const [messages, setMessages] = useState<ChatMsg[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isStartingCall, setIsStartingCall] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const navigation = useNavigation<NativeStackNavigationProp<DoctorStackParamList>>();
+  const { token } = useAuth();
+
+  const handleStartVideoCall = async () => {
+    if (!token) {
+      Alert.alert('Error', 'You must be logged in to start a video call.');
+      return;
+    }
+    setIsStartingCall(true);
+    try {
+      const room = await createVideoRoom(token);
+      navigation.navigate('VideoCallScreen', {
+        roomUrl: room.room_url,
+        patientName: ACTIVE_PATIENT.name,
+        consultationId: room.consultation_id ?? undefined,
+      });
+    } catch (err: any) {
+      Alert.alert('Video Call Error', err.message || 'Failed to create video room.');
+    } finally {
+      setIsStartingCall(false);
+    }
+  };
 
   const sendMessage = (text: string) => {
     if (!text.trim()) return;
@@ -82,7 +112,7 @@ export const LiveConsultationScreen: React.FC = () => {
       <View style={styles.patientBar}>
         <View style={styles.patientBarLeft}>
           <View style={styles.patientBarAvatar}>
-            <Text style={{ fontSize: 20 }}>👨</Text>
+            <MaterialCommunityIcons name="account" size={20} color={theme.colors.primary} />
           </View>
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -99,13 +129,13 @@ export const LiveConsultationScreen: React.FC = () => {
         </View>
         <View style={styles.patientBarActions}>
           <Pressable style={styles.barActionBtn}>
-            <Text style={{ fontSize: 18 }}>📞</Text>
+            <MaterialCommunityIcons name="phone-outline" size={18} color="#334155" />
           </Pressable>
-          <Pressable style={styles.barActionBtn}>
-            <Text style={{ fontSize: 18 }}>📹</Text>
+          <Pressable style={styles.barActionBtn} onPress={handleStartVideoCall} disabled={isStartingCall}>
+            <MaterialCommunityIcons name={isStartingCall ? 'loading' : 'video-outline'} size={18} color="#334155" />
           </Pressable>
           <Pressable style={[styles.barActionBtn, { backgroundColor: '#FEF2F2' }]}>
-            <Text style={{ fontSize: 16 }}>🔚</Text>
+            <MaterialCommunityIcons name="phone-hangup" size={16} color="#DC2626" />
           </Pressable>
         </View>
       </View>
@@ -114,7 +144,6 @@ export const LiveConsultationScreen: React.FC = () => {
       <View style={styles.miniVitalsBar}>
         <MiniVital label="HR" value={`${ACTIVE_PATIENT.vitals.hr}`} unit="bpm" alert={ACTIVE_PATIENT.vitals.hr > 100} />
         <MiniVital label="BP" value={ACTIVE_PATIENT.vitals.bp} unit="" alert={true} />
-        <MiniVital label="SpO₂" value={`${ACTIVE_PATIENT.vitals.spo2}%`} unit="" alert={ACTIVE_PATIENT.vitals.spo2 < 92} />
         <MiniVital label="Temp" value={`${ACTIVE_PATIENT.vitals.temp}°F`} unit="" alert={false} />
         <View style={styles.symptomMini}>
           {ACTIVE_PATIENT.symptoms.slice(0, 2).map((s, i) => (
@@ -147,7 +176,7 @@ export const LiveConsultationScreen: React.FC = () => {
             >
               {!isDoctor && (
                 <View style={styles.msgAvatar}>
-                  <Text style={{ fontSize: 14 }}>👤</Text>
+                  <MaterialCommunityIcons name="account-outline" size={14} color="#64748B" />
                 </View>
               )}
               <View style={[styles.bubble, isDoctor ? styles.bubbleDoctor : styles.bubblePatient]}>
@@ -162,7 +191,7 @@ export const LiveConsultationScreen: React.FC = () => {
         {isTyping && (
           <View style={[styles.msgRow, styles.msgRowPatient]}>
             <View style={styles.msgAvatar}>
-              <Text style={{ fontSize: 14 }}>👤</Text>
+              <MaterialCommunityIcons name="account-outline" size={14} color="#64748B" />
             </View>
             <View style={[styles.bubble, styles.bubblePatient, { paddingVertical: 12 }]}>
               <Text style={styles.typingDots}>● ● ●</Text>
@@ -188,7 +217,7 @@ export const LiveConsultationScreen: React.FC = () => {
       {/* ─── Input Bar ─── */}
       <View style={styles.inputBar}>
         <Pressable style={styles.attachBtn}>
-          <Text style={{ fontSize: 20 }}>📎</Text>
+          <MaterialCommunityIcons name="paperclip" size={20} color="#64748B" />
         </Pressable>
         <TextInput
           style={styles.chatInput}
@@ -199,7 +228,7 @@ export const LiveConsultationScreen: React.FC = () => {
           multiline
         />
         <Pressable style={styles.sendBtn} onPress={() => sendMessage(input)}>
-          <Text style={{ fontSize: 18, color: '#FFF' }}>➤</Text>
+          <MaterialCommunityIcons name="send" size={18} color="#FFF" />
         </Pressable>
       </View>
     </KeyboardAvoidingView>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { Card } from '../../components/ui/Card';
@@ -10,55 +11,29 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { theme } from '../../utils/theme';
 
-// Real backend auth is active  — set to true only for offline UI testing
-const DEMO_MODE = false;
-
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 
-const ROLES: { value: UserRole; label: string; icon: string; color: string; bg: string }[] = [
-  { value: 'patient',  label: 'Patient',  icon: '🧑',  color: '#0A84FF', bg: '#EFF6FF' },
-  { value: 'doctor',   label: 'Doctor',   icon: '👨‍⚕️', color: '#059669', bg: '#ECFDF5' },
-  { value: 'chw',      label: 'CHW',      icon: '🏥',  color: '#7C3AED', bg: '#F5F3FF' },
-  { value: 'admin',    label: 'Admin',    icon: '🛡️',  color: '#DC2626', bg: '#FEF2F2' },
+const ROLES: { value: UserRole; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string; bg: string }[] = [
+  { value: 'patient',  label: 'Patient',  icon: 'account-outline',        color: '#0A84FF', bg: '#EFF6FF' },
+  { value: 'doctor',   label: 'Doctor',   icon: 'stethoscope',             color: '#059669', bg: '#ECFDF5' },
+  { value: 'chw',      label: 'CHW',      icon: 'hospital-building',       color: '#7C3AED', bg: '#F5F3FF' },
+  { value: 'admin',    label: 'Admin',    icon: 'shield-account-outline',  color: '#DC2626', bg: '#FEF2F2' },
 ];
 
 export const LoginRegisterScreen: React.FC<Props> = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
 
-  const [phone, setPhone]       = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [name, setName]         = useState('');
   const [mode, setMode]         = useState<'login' | 'register'>('login');
   const [role, setRole]         = useState<UserRole>('patient');
-  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
 
-  const handleSubmit = async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      if (DEMO_MODE) {
-        // ── Demo mode: skip API, log in with any input ──
-        await login(role, 'demo-token', 'demo-user-001');
-      } else {
-        // ── Real auth (restore when backend is ready) ──
-        const { login: apiLogin, register: apiRegister } = await import('../../services/api');
-        if (mode === 'register') {
-          const res = await apiRegister({ full_name: fullName, phone, password });
-          await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
-        } else {
-          const res = await apiLogin({ phone, password });
-          await login((res.user.role as UserRole) || role, res.access_token, res.user.id);
-        }
-      }
-    } catch (err: any) {
-      const msg = err?.message || 'Login failed. Please try again.';
-      // Use Alert to show authentication errors to the user
-      const { Alert } = require('react-native');
-      Alert.alert('Authentication Error', msg);
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = () => {
+    setError(null);
+    if (!name.trim()) { setError('Please enter your name.'); return; }
+    // Dummy auth — no backend, no password, just pick a name + role and go
+    login(role, 'dummy-token', 'dummy-user-id', name.trim());
   };
 
   return (
@@ -66,11 +41,6 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
       <Card style={styles.card}>
         <Text style={styles.title}>Swasthya Saathi</Text>
         <Text style={styles.subtitle}>Your Health Companion</Text>
-
-        {/* Demo badge */}
-        <View style={styles.demoBadge}>
-          <Text style={styles.demoBadgeText}>🚧 Demo Mode — any input works</Text>
-        </View>
 
         {/* Login / Register tabs */}
         <View style={styles.modeRow}>
@@ -82,25 +52,10 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
           </Pressable>
         </View>
 
-        {mode === 'register' && (
-          <InputField
-            label="Full Name"
-            value={fullName}
-            onChangeText={setFullName}
-          />
-        )}
-
         <InputField
-          label="Phone Number"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
-        <InputField
-          label={t('password')}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
+          label="Your Name"
+          value={name}
+          onChangeText={setName}
         />
 
         {/* Role selector */}
@@ -117,7 +72,7 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
                   { borderColor: active ? r.color : '#E5E7EB', backgroundColor: active ? r.bg : '#F9FAFB' },
                 ]}
               >
-                <Text style={styles.roleIcon}>{r.icon}</Text>
+                <MaterialCommunityIcons name={r.icon} size={16} color={active ? r.color : '#94A3B8'} />
                 <Text style={[styles.roleText, { color: active ? r.color : theme.colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
                   {r.label}
                 </Text>
@@ -127,10 +82,11 @@ export const LoginRegisterScreen: React.FC<Props> = () => {
           })}
         </View>
 
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
         <PrimaryButton
-          title={loading ? 'Signing in…' : mode === 'login' ? t('login') : t('register')}
+          title={mode === 'login' ? 'Enter as ' + role.charAt(0).toUpperCase() + role.slice(1) : 'Register as ' + role.charAt(0).toUpperCase() + role.slice(1)}
           onPress={handleSubmit}
-          disabled={loading}
         />
       </Card>
     </ScrollView>
@@ -159,21 +115,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
-  },
-  demoBadge: {
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  demoBadgeText: {
-    fontSize: 12,
-    color: '#92400E',
-    fontWeight: '600',
   },
   modeRow: {
     flexDirection: 'row',
@@ -217,9 +158,7 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     flex: 1,
   },
-  roleIcon: {
-    fontSize: 16,
-  },
+  // roleIcon style removed — using MaterialCommunityIcons inline
   roleText: {
     fontSize: 13,
     flex: 1,
@@ -228,5 +167,12 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.security import setup_security
 from app.db.database import engine, Base
-from app.api import auth, symptom_collection, triage, health, symptom_agent, voice
+from app.api import auth, symptom_collection, triage, health, symptom_agent, voice, video
 
 
 def create_app() -> FastAPI:
@@ -61,6 +61,11 @@ def create_app() -> FastAPI:
         voice.router,
         prefix="/api/voice",
         tags=["Voice Transcription"],
+    )
+    app.include_router(
+        video.router,
+        prefix="/api/video",
+        tags=["Video Call"],
     )
 
     return app
