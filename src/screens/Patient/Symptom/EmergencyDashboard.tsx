@@ -142,9 +142,7 @@ export const EmergencyDashboard: React.FC<Props> = ({ navigation }) => {
         <PrimaryButton
           title="📍 Share Live Location"
           variant="neutral"
-          onPress={() => {
-            /* would use expo-location in production */
-          }}
+          onPress={() => navigation.navigate('NearbyHospitalsScreen')}
         />
       </View>
 

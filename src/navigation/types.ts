@@ -22,6 +22,8 @@ export type PatientStackParamList = {
   DoctorNeededDashboard: undefined;
   EmergencyDashboard: { classificationId: string };
   DoctorSelectionScreen: undefined;
+  /* Geofencing */
+  NearbyHospitalsScreen: undefined;
   /* Shared */
   RecordsScreen: undefined;
   CaseDetailScreen: { caseId: string };

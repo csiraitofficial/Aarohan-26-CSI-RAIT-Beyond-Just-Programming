@@ -179,6 +179,22 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </Pressable>
       </View>
 
+      {/* ── Nearby Hospitals ── */}
+      <Pressable
+        style={styles.hospitalCard}
+        onPress={() => navigation.navigate('NearbyHospitalsScreen')}
+        accessibilityLabel="Find Nearby Hospitals"
+      >
+        <View style={styles.hospitalCardInner}>
+          <Text style={styles.hospitalCardEmoji}>🏥</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.hospitalCardTitle}>Find Nearby Hospitals</Text>
+            <Text style={styles.hospitalCardDesc}>Locate hospitals, clinics & emergency rooms near you</Text>
+          </View>
+          <Text style={styles.hospitalCardArrow}>›</Text>
+        </View>
+      </Pressable>
+
       {/* ═══════════════════════════════════════
           UPCOMING REMINDERS
       ═══════════════════════════════════════ */}
@@ -421,4 +437,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emergencyBtnText: { color: '#FFF', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+
+  /* ── Nearby Hospitals Card ── */
+  hospitalCard: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  hospitalCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  hospitalCardEmoji: { fontSize: 32 },
+  hospitalCardTitle: { fontSize: 16, fontWeight: '800', color: '#1E40AF' },
+  hospitalCardDesc: { fontSize: 12, color: '#3B82F6', marginTop: 2 },
+  hospitalCardArrow: { fontSize: 26, color: '#3B82F6', fontWeight: '300' },
 });
