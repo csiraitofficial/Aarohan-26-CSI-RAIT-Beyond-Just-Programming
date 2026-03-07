@@ -171,6 +171,11 @@ async def analyze_scan_test(
 
     try:
         result = analyze_medical_image(image_bytes, description)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

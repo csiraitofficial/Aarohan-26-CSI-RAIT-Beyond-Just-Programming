@@ -212,6 +212,34 @@ def generate_gradcam_heatmap(image_bytes: bytes, confidence: float) -> str:
     return f"data:image/png;base64,{img_b64}"
 
 
+# ─── Pre-flight Image Validation ──────────────────────────────
+def validate_medical_image(image_bytes: bytes) -> bool:
+    """
+    Use Gemini Vision to check if the uploaded image is genuinely a medical scan.
+    If Gemini is unavailable, defaults to True to allow the pipeline to proceed.
+    """
+    if not GEMINI_AVAILABLE:
+        return True
+
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        img = Image.open(io.BytesIO(image_bytes))
+        prompt = "Is this image a medical scan (such as an X-ray, CT scan, MRI, or Ultrasound)? Answer exactly 'YES' or 'NO'."
+        
+        response = model.generate_content([prompt, img])
+        text = response.text.strip().upper()
+        
+        if "NO" in text and "YES" not in text:
+            return False
+            
+        return True
+    except Exception as exc:
+        import traceback
+        logger.warning(f"Image validation failed, allowing through: {exc}")
+        logger.warning(traceback.format_exc())
+        return True
+
+
 # ─── Gemini-Enhanced Clinical Report ───────────────────────────
 def get_gemini_analysis(
     disease: str, confidence: float, description: str = ""
@@ -224,7 +252,7 @@ def get_gemini_analysis(
         return _get_static_analysis(disease, confidence)
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         prompt = f"""You are a medical AI assistant. A chest X-ray has been analyzed by a trained CNN model.
 
 Prediction: {disease} (Confidence: {confidence:.1f}%)
@@ -288,11 +316,16 @@ def analyze_medical_image(
 ) -> dict:
     """
     Full MediScan analysis pipeline:
-    1. TFLite inference → disease prediction + top-5
+    0. Validate image (Gemini)
+    1. Ensemble inference → disease prediction + top-5
     2. GradCAM heatmap
     3. Gemini-enhanced clinical report
     4. Return combined result
     """
+    # Pre-flight validation
+    if not validate_medical_image(image_bytes):
+        raise ValueError("Invalid Image: The uploaded file does not appear to be a medical scan (e.g. X-ray, MRI, CT). Please upload a valid medical image.")
+
     # Step 1: Predict disease
     prediction = predict_disease(image_bytes)
 

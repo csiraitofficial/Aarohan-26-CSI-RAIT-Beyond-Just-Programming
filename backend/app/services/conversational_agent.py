@@ -124,7 +124,7 @@ Return ONLY the rephrased question text, nothing else.
 def _get_model():
     """Get Gemini model instance."""
     return genai.GenerativeModel(
-        "gemini-2.0-flash",
+        "gemini-2.5-flash",
         system_instruction=SYSTEM_PROMPT,
     )
 
