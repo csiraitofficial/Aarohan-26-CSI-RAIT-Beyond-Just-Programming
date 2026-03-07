@@ -1,9 +1,42 @@
-const BASE_URL = 'http://192.168.137.110:8000';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-// HTTPS check disabled for local development
-// if (!BASE_URL.startsWith('https://')) {
-//   throw new Error('HTTPS is required for all API traffic.');
-// }
+// Computes the backend URL lazily (called on first request, not at import time).
+// Priority: app.json extra.BACKEND_URL > debuggerHost LAN IP > hardcoded fallback
+let _baseUrl: string | null = null;
+export function getBaseUrl(): string {
+  if (_baseUrl) return _baseUrl;
+
+  // 1. Check for explicit config in app.json > expo > extra
+  const configUrl: string | undefined = Constants.expoConfig?.extra?.BACKEND_URL;
+  if (configUrl) {
+    _baseUrl = configUrl.replace(/\/+$/, ''); // trim trailing slash
+    return _baseUrl;
+  }
+
+  // 2. Web defaults to localhost
+  if (Platform.OS === 'web') {
+    _baseUrl = 'http://localhost:8000';
+    return _baseUrl;
+  }
+
+  // 3. Auto-detect from Expo debuggerHost (works in LAN mode)
+  const debuggerHost: string | undefined =
+    (Constants.expoGoConfig as any)?.debuggerHost ??
+    (Constants as any).manifest2?.debuggerHost ??
+    (Constants as any).manifest?.debuggerHost;
+  if (debuggerHost) {
+    const ip = debuggerHost.split(':')[0];
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+      _baseUrl = `http://${ip}:8000`;
+      return _baseUrl;
+    }
+  }
+
+  // 4. Hardcoded fallback
+  _baseUrl = 'http://192.168.137.192:8000';
+  return _baseUrl;
+}
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -11,15 +44,38 @@ type RequestOptions = {
   token?: string;
 };
 
+const TIMEOUT_MS = 15000;
+
+function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  return Promise.race([
+    fetch(url, init),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('No response from server. Make sure your phone is on the same WiFi as this machine.')),
+        TIMEOUT_MS,
+      )
+    ),
+  ]);
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {})
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
+  const BASE_URL = getBaseUrl();
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${BASE_URL}${path}`, {
+      method: options.method ?? 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (err: any) {
+    throw new Error(
+      (err?.message ?? 'Cannot reach the server.') +
+      `\n\nBackend URL: ${BASE_URL}\nMake sure your phone is on the same WiFi as this PC.`
+    );
+  }
 
   if (!response.ok) {
     let errorMessage = `Request failed with status ${response.status}`;
@@ -27,10 +83,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       const errorData = await response.json();
       errorMessage = errorData.detail || errorData.message || errorMessage;
     } catch {
-      // If JSON parsing fails, use the default message
+      // ignore parse errors
     }
-    
-    // Special handling for common errors
+
     if (response.status === 401) {
       throw new Error('Authentication required. Please log in again.');
     } else if (response.status === 403) {
@@ -40,7 +95,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } else if (response.status >= 500) {
       throw new Error('Server error. Please try again later.');
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -58,6 +113,21 @@ export interface AuthResponse {
     phone: string;
     email?: string;
     role: string;
+    language_preference?: string;
+    date_of_birth?: string;
+    gender?: string;
+    address?: string;
+    is_active: boolean;
+    doctor_profile?: {
+      license_number: string;
+      specialization?: string;
+      hospital_name?: string;
+      years_of_experience?: number;
+    };
+    chw_profile?: {
+      worker_id: string;
+      assigned_district?: string;
+    };
   };
 }
 
@@ -66,8 +136,19 @@ export interface RegisterData {
   phone: string;
   email?: string;
   password: string;
+  role?: string;
   gender?: string;
   date_of_birth?: string;
+  language_preference?: string;
+  address?: string;
+  // Doctor-specific
+  license_number?: string;
+  specialization?: string;
+  hospital_name?: string;
+  years_of_experience?: number;
+  // CHW-specific
+  worker_id?: string;
+  assigned_district?: string;
 }
 
 export interface LoginData {
@@ -86,6 +167,27 @@ export async function login(data: LoginData): Promise<AuthResponse> {
   return apiRequest<AuthResponse>('/api/auth/login', {
     method: 'POST',
     body: data,
+  });
+}
+
+export async function fetchProfile(token: string): Promise<AuthResponse['user']> {
+  return apiRequest<AuthResponse['user']>('/api/auth/me', { token });
+}
+
+export interface UpdateProfileData {
+  full_name?: string;
+  email?: string;
+  language_preference?: string;
+  date_of_birth?: string;
+  gender?: string;
+  address?: string;
+}
+
+export async function updateProfileApi(data: UpdateProfileData, token: string): Promise<AuthResponse['user']> {
+  return apiRequest<AuthResponse['user']>('/api/auth/me', {
+    method: 'PUT',
+    body: data,
+    token,
   });
 }
 
@@ -157,6 +259,35 @@ export async function completeSymptomSession(sessionId: string, token: string): 
 
 export async function getConversationHistory(sessionId: string, token: string): Promise<ConversationHistory> {
   return apiRequest<ConversationHistory>(`/api/symptom-agent/${sessionId}/conversation`, {
+    token,
+  });
+}
+
+/* ─── Video Call API ─── */
+
+export interface VideoRoomResponse {
+  room_url: string;
+  room_name: string;
+  consultation_id: string | null;
+}
+
+export async function createVideoRoom(token: string, consultationId?: string): Promise<VideoRoomResponse> {
+  return apiRequest<VideoRoomResponse>('/api/video/create-room', {
+    method: 'POST',
+    body: { consultation_id: consultationId ?? null },
+    token,
+  });
+}
+
+export async function joinVideoRoom(consultationId: string, token: string): Promise<VideoRoomResponse> {
+  return apiRequest<VideoRoomResponse>(`/api/video/join/${encodeURIComponent(consultationId)}`, {
+    token,
+  });
+}
+
+export async function endVideoRoom(consultationId: string, token: string): Promise<{ detail: string }> {
+  return apiRequest<{ detail: string }>(`/api/video/end-room/${encodeURIComponent(consultationId)}`, {
+    method: 'DELETE',
     token,
   });
 }

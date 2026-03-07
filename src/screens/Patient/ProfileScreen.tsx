@@ -1,22 +1,96 @@
-import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../components/ui/SecondaryButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
-import { usePatient } from '../../context/PatientContext';
 import { useAuth } from '../../context/AuthContext';
+import { fetchProfile, updateProfileApi } from '../../services/api';
 import { theme } from '../../utils/theme';
 
-export const ProfileScreen: React.FC = () => {
-  const { profile, updateProfile } = usePatient();
-  const { logout } = useAuth();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(profile);
+interface ProfileData {
+  full_name: string;
+  phone: string;
+  email: string;
+  role: string;
+  gender: string;
+  date_of_birth: string;
+  language_preference: string;
+  address: string;
+}
 
-  const save = () => {
-    updateProfile(draft);
-    setEditing(false);
+export const ProfileScreen: React.FC = () => {
+  const { token, fullName, phone, role, logout } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [profile, setProfile] = useState<ProfileData>({
+    full_name: fullName || '',
+    phone: phone || '',
+    email: '',
+    role: role || 'patient',
+    gender: '',
+    date_of_birth: '',
+    language_preference: 'en',
+    address: '',
+  });
+  const [draft, setDraft] = useState<ProfileData>(profile);
+
+  useEffect(() => {
+    if (!token) return;
+    fetchProfile(token)
+      .then((user) => {
+        const p: ProfileData = {
+          full_name: user.full_name || '',
+          phone: user.phone || '',
+          email: user.email || '',
+          role: user.role || 'patient',
+          gender: user.gender || '',
+          date_of_birth: user.date_of_birth || '',
+          language_preference: user.language_preference || 'en',
+          address: user.address || '',
+        };
+        setProfile(p);
+        setDraft(p);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const save = async () => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      const updated = await updateProfileApi(
+        {
+          full_name: draft.full_name,
+          gender: draft.gender || undefined,
+          date_of_birth: draft.date_of_birth || undefined,
+          language_preference: draft.language_preference || undefined,
+          address: draft.address || undefined,
+          email: draft.email || undefined,
+        },
+        token,
+      );
+      const p: ProfileData = {
+        full_name: updated.full_name || '',
+        phone: updated.phone || '',
+        email: updated.email || '',
+        role: updated.role || 'patient',
+        gender: updated.gender || '',
+        date_of_birth: updated.date_of_birth || '',
+        language_preference: updated.language_preference || 'en',
+        address: updated.address || '',
+      };
+      setProfile(p);
+      setDraft(p);
+      setEditing(false);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const confirmLogout = () => {
@@ -26,47 +100,62 @@ export const ProfileScreen: React.FC = () => {
     ]);
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>  
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  const roleLabel = profile.role.charAt(0).toUpperCase() + profile.role.slice(1);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <SectionHeader title="My Profile" />
 
       <Card style={styles.avatarCard}>
-        <Text style={styles.avatar}>👩🏽</Text>
-        <Text style={styles.name}>{profile.name}</Text>
-        <Text style={styles.meta}>{profile.age} yrs • {profile.gender}</Text>
+        <View style={styles.avatarWrap}>
+          <MaterialCommunityIcons name="account" size={40} color={theme.colors.primary} />
+        </View>
+        <Text style={styles.name}>{profile.full_name || 'User'}</Text>
+        <Text style={styles.meta}>{roleLabel} {profile.gender ? `• ${profile.gender}` : ''}</Text>
       </Card>
 
       {editing ? (
         <Card>
-          <Field label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
-          <Field label="Age" value={String(draft.age)} onChange={(v) => setDraft({ ...draft, age: Number(v) || 0 })} numeric />
+          <Field label="Full Name" value={draft.full_name} onChange={(v) => setDraft({ ...draft, full_name: v })} />
+          <Field label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} />
           <Field label="Gender" value={draft.gender} onChange={(v) => setDraft({ ...draft, gender: v })} />
-          <Field label="Emergency Contact" value={draft.emergencyContact} onChange={(v) => setDraft({ ...draft, emergencyContact: v })} />
-          <Field label="Medical History" value={draft.medicalHistory} onChange={(v) => setDraft({ ...draft, medicalHistory: v })} />
-          <Field
-            label="Allergies (comma-separated)"
-            value={draft.allergies.join(', ')}
-            onChange={(v) => setDraft({ ...draft, allergies: v.split(',').map((a) => a.trim()).filter(Boolean) })}
-          />
+          <Field label="Date of Birth (YYYY-MM-DD)" value={draft.date_of_birth} onChange={(v) => setDraft({ ...draft, date_of_birth: v })} />
+          <Field label="Language" value={draft.language_preference} onChange={(v) => setDraft({ ...draft, language_preference: v })} />
+          <Field label="Address" value={draft.address} onChange={(v) => setDraft({ ...draft, address: v })} />
           <View style={styles.editActions}>
             <SecondaryButton title="Cancel" onPress={() => { setDraft(profile); setEditing(false); }} />
             <View style={{ width: 12 }} />
-            <PrimaryButton title="Save" onPress={save} />
+            {saving ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <PrimaryButton title="Save" onPress={save} />
+            )}
           </View>
         </Card>
       ) : (
         <Card>
-          <Row label="Emergency Contact" value={profile.emergencyContact} />
-          <Row label="Language" value={profile.language.toUpperCase()} />
-          <Row label="Medical History" value={profile.medicalHistory} />
-          <Row label="Allergies" value={profile.allergies.length > 0 ? profile.allergies.join(', ') : 'None'} />
+          <Row label="Phone" value={profile.phone} />
+          <Row label="Email" value={profile.email || 'Not set'} />
+          <Row label="Role" value={roleLabel} />
+          <Row label="Gender" value={profile.gender || 'Not set'} />
+          <Row label="Date of Birth" value={profile.date_of_birth || 'Not set'} />
+          <Row label="Language" value={profile.language_preference.toUpperCase()} />
+          <Row label="Address" value={profile.address || 'Not set'} />
           <View style={{ height: 16 }} />
-          <PrimaryButton title="✏️ Edit Profile" onPress={() => setEditing(true)} />
+          <PrimaryButton title="Edit Profile" onPress={() => setEditing(true)} />
         </Card>
       )}
 
       <View style={styles.logoutWrap}>
-        <SecondaryButton title="🚪 Logout" onPress={confirmLogout} />
+        <SecondaryButton title="Logout" onPress={confirmLogout} />
       </View>
     </ScrollView>
   );
@@ -90,7 +179,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   content: { padding: theme.spacing.lg, paddingBottom: 40 },
   avatarCard: { alignItems: 'center', paddingVertical: 24 },
-  avatar: { fontSize: 48, marginBottom: 8 },
+  avatarWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#EBF3FF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   name: { fontSize: 22, fontWeight: '800', color: theme.colors.textPrimary },
   meta: { color: theme.colors.textSecondary, marginTop: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },

@@ -3,6 +3,7 @@ import {
   Alert, Animated, Pressable, ScrollView, Share,
   StyleSheet, Text, View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { PatientStackParamList } from '../../navigation/types';
@@ -63,11 +64,11 @@ const ConfidenceRing: React.FC<{ pct: number; color: string; size?: number }> = 
 /* ─────────────────────────────────────────────────────────
    VITAL CARD  (grid item)
 ───────────────────────────────────────────────────────── */
-const VitalCard: React.FC<{ icon: string; label: string; value: string; unit: string; normal?: boolean }> = ({
+const VitalCard: React.FC<{ icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; value: string; unit: string; normal?: boolean }> = ({
   icon, label, value, unit, normal = true,
 }) => (
   <View style={[vcStyles.card, !normal && { borderColor: theme.colors.danger, borderWidth: 1.5 }]}>
-    <Text style={vcStyles.icon}>{icon}</Text>
+    <MaterialCommunityIcons name={icon} size={22} color={normal ? theme.colors.primary : theme.colors.danger} style={{ marginBottom: 4 }} />
     <Text style={vcStyles.value} numberOfLines={1}>{value || '—'}</Text>
     {value ? <Text style={vcStyles.unit}>{unit}</Text> : null}
     <Text style={vcStyles.label} numberOfLines={1}>{label}</Text>
@@ -92,10 +93,10 @@ const vcStyles = StyleSheet.create({
 /* ─────────────────────────────────────────────────────────
    SECTION LABEL
 ───────────────────────────────────────────────────────── */
-const SectionLabel: React.FC<{ icon: string; title: string; accent?: string }> = ({ icon, title, accent = theme.colors.primary }) => (
+const SectionLabel: React.FC<{ icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; accent?: string }> = ({ icon, title, accent = theme.colors.primary }) => (
   <View style={slStyles.row}>
     <View style={[slStyles.bar, { backgroundColor: accent }]} />
-    <Text style={slStyles.icon}>{icon}</Text>
+    <MaterialCommunityIcons name={icon} size={16} color={accent} />
     <Text style={slStyles.title}>{title}</Text>
   </View>
 );
@@ -152,7 +153,7 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   if (!record) {
     return (
       <View style={cdStyles.notFound}>
-        <Text style={{ fontSize: 56 }}>🗂️</Text>
+        <MaterialCommunityIcons name="folder-open-outline" size={56} color={theme.colors.textSecondary} />
         <Text style={cdStyles.notFoundTitle}>Record Not Found</Text>
         <Text style={cdStyles.notFoundSub}>This record may have been removed.</Text>
         <Pressable onPress={() => navigation.goBack()} style={cdStyles.notFoundBtn}>
@@ -181,9 +182,9 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const statusOrder = ['active', 'doctor_assigned', 'referred', 'closed'];
   const currentIdx  = statusOrder.indexOf(record.status);
   const doctorReferral =
-    risk === 'emergency' ? '🚨 Immediate emergency referral required' :
-    risk === 'moderate'  ? '👨‍⚕️ Doctor consultation strongly recommended' :
-                           '✅ No doctor referral required at this time';
+    risk === 'emergency' ? 'Immediate emergency referral required' :
+    risk === 'moderate'  ? 'Doctor consultation strongly recommended' :
+                           'No doctor referral required at this time';
   const reportText =
     `Swasthya Saathi — Health Report\n${'━'.repeat(32)}\n` +
     `Patient : ${profile?.name ?? 'Patient'}\nDate    : ${formattedDate}\n` +
@@ -216,9 +217,11 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={cdStyles.heroDate}>{formattedDate}</Text>
             </View>
             <View style={cdStyles.riskCircle}>
-              <Text style={cdStyles.riskEmoji}>
-                {risk === 'mild' ? '🟢' : risk === 'moderate' ? '🟡' : '🔴'}
-              </Text>
+              <MaterialCommunityIcons
+                name="circle"
+                size={28}
+                color={risk === 'mild' ? '#22C55E' : risk === 'moderate' ? '#EAB308' : '#EF4444'}
+              />
               <Text style={cdStyles.riskWord}>
                 {risk.charAt(0).toUpperCase() + risk.slice(1)}
               </Text>
@@ -226,7 +229,7 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
           <View style={cdStyles.heroPills}>
             <View style={cdStyles.heroPill}>
-              <Text style={cdStyles.heroPillTxt}>📋 ID #{record.id}</Text>
+              <Text style={cdStyles.heroPillTxt}><MaterialCommunityIcons name="clipboard-text-outline" size={12} color="#FFF" /> ID #{record.id}</Text>
             </View>
             <View style={[cdStyles.heroPill, { backgroundColor: statusCfg.bg }]}>
               <Text style={[cdStyles.heroPillTxt, { color: statusCfg.text }]}>
@@ -238,7 +241,7 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* ── SYMPTOMS ── */}
         <InfoCard>
-          <SectionLabel icon="🤒" title="Symptoms Reported" />
+          <SectionLabel icon="thermometer" title="Symptoms Reported" />
           <View style={cdStyles.tagWrap}>
             {(record.symptoms.length > 0 ? record.symptoms : ['No symptoms recorded']).map((s) => (
               <View key={s} style={cdStyles.symTag}>
@@ -250,26 +253,26 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* ── VITALS 3-COLUMN GRID ── */}
         <InfoCard>
-          <SectionLabel icon="📋" title="Entered Vitals" />
+          <SectionLabel icon="clipboard-text-outline" title="Entered Vitals" />
           <View style={cdStyles.vitalsGrid}>
-            <VitalCard icon="🌡️" label="Temperature"   value={record.vitals.temperature}      unit="°F"   />
-            <VitalCard icon="🩺" label="Blood Pressure" value={record.vitals.bloodPressure}    unit="mmHg" />
-            <VitalCard icon="🫁" label="Oxygen (SpO₂)" value={record.vitals.oxygenSaturation} unit="%"
+            <VitalCard icon="thermometer"         label="Temperature"   value={record.vitals.temperature}      unit="°F"   />
+            <VitalCard icon="stethoscope"          label="Blood Pressure" value={record.vitals.bloodPressure}    unit="mmHg" />
+            <VitalCard icon="lungs"                label="Oxygen (SpO₂)" value={record.vitals.oxygenSaturation} unit="%"
               normal={
                 !record.vitals.oxygenSaturation ||
                 parseFloat(record.vitals.oxygenSaturation) >= 95
               }
             />
-            <VitalCard icon="🩸" label="Blood Sugar"   value="" unit="mg/dL" />
-            <VitalCard icon="❤️" label="Heart Rate"    value="" unit="bpm"   />
-            <VitalCard icon="⚖️" label="BMI"           value="" unit="kg/m²" />
+            <VitalCard icon="water"               label="Blood Sugar"   value="" unit="mg/dL" />
+            <VitalCard icon="heart-outline"         label="Heart Rate"    value="" unit="bpm"   />
+            <VitalCard icon="scale-bathroom"        label="BMI"           value="" unit="kg/m²" />
           </View>
           <Text style={cdStyles.vitalsNote}>— values not entered for this check</Text>
         </InfoCard>
 
         {/* ── AI ANALYSIS ── */}
         <InfoCard style={{ borderLeftWidth: 4, borderLeftColor: palette.bg }}>
-          <SectionLabel icon="🤖" title="AI Risk Analysis" accent={palette.bg} />
+          <SectionLabel icon="robot-outline" title="AI Risk Analysis" accent={palette.bg} />
           <View style={cdStyles.aiTopRow}>
             <View style={[cdStyles.aiRiskBadge, { backgroundColor: palette.pill }]}>
               <Text style={[cdStyles.aiRiskLabel, { color: palette.bg }]}>
@@ -289,14 +292,14 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
           {record.classification?.redFlagsDetected && (
             <View style={cdStyles.redFlagBox}>
-              <Text style={cdStyles.redFlagTxt}>⚠️ Red flags detected — seek care immediately</Text>
+              <Text style={cdStyles.redFlagTxt}><MaterialCommunityIcons name="alert-outline" size={14} color="#991B1B" /> Red flags detected — seek care immediately</Text>
             </View>
           )}
         </InfoCard>
 
         {/* ── DOCTOR RECOMMENDATION + TIMELINE ── */}
         <InfoCard>
-          <SectionLabel icon="👨‍⚕️" title="Doctor Recommendation" />
+          <SectionLabel icon="doctor" title="Doctor Recommendation" />
           <View style={cdStyles.referralRow}>
             <Text style={cdStyles.referralTxt}>{doctorReferral}</Text>
           </View>
@@ -306,7 +309,7 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
           {record.doctorNotes ? (
             <View style={cdStyles.doctorNotesBox}>
-              <Text style={cdStyles.doctorNotesLabel}>📝 Doctor Notes</Text>
+              <Text style={cdStyles.doctorNotesLabel}><MaterialCommunityIcons name="note-text-outline" size={12} color="#92400E" /> Doctor Notes</Text>
               <Text style={cdStyles.doctorNotesTxt}>{record.doctorNotes}</Text>
             </View>
           ) : null}
@@ -321,10 +324,10 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* ── TREATMENT ADVICE ── */}
         <InfoCard>
-          <SectionLabel icon="💊" title="Treatment Advice" />
+          <SectionLabel icon="pill" title="Treatment Advice" />
           {homeRemedies.length > 0 && (
             <View style={{ marginBottom: 12 }}>
-              <Text style={cdStyles.adviceSubhead}>🌿 Home Remedies</Text>
+              <Text style={cdStyles.adviceSubhead}><MaterialCommunityIcons name="leaf" size={14} color={theme.colors.primary} /> Home Remedies</Text>
               {homeRemedies.map((r, i) => (
                 <View key={i} style={cdStyles.bulletRow}>
                   <Text style={cdStyles.bullet}>•</Text>
@@ -335,7 +338,7 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           )}
           {warningSigns.length > 0 && (
             <View>
-              <Text style={[cdStyles.adviceSubhead, { color: theme.colors.danger }]}>⚠️ Warning Signs</Text>
+              <Text style={[cdStyles.adviceSubhead, { color: theme.colors.danger }]}><MaterialCommunityIcons name="alert-outline" size={14} color={theme.colors.danger} /> Warning Signs</Text>
               {warningSigns.map((w, i) => (
                 <View key={i} style={cdStyles.bulletRow}>
                   <Text style={[cdStyles.bullet, { color: theme.colors.danger }]}>•</Text>
@@ -364,10 +367,10 @@ export const CaseDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {/* ── STICKY BOTTOM BAR ── */}
       <View style={cdStyles.stickyBar}>
         <Pressable style={[cdStyles.stickyBtn, cdStyles.downloadBtn]} onPress={handleDownload}>
-          <Text style={cdStyles.downloadTxt}>⬇ Download</Text>
+          <Text style={cdStyles.downloadTxt}><MaterialCommunityIcons name="download" size={14} color={theme.colors.textPrimary} /> Download</Text>
         </Pressable>
         <Pressable style={[cdStyles.stickyBtn, cdStyles.shareBtn]} onPress={handleShare}>
-          <Text style={cdStyles.shareTxt}>🔗 Share with Doctor</Text>
+          <Text style={cdStyles.shareTxt}><MaterialCommunityIcons name="share-variant-outline" size={14} color="#FFF" /> Share with Doctor</Text>
         </Pressable>
       </View>
     </View>

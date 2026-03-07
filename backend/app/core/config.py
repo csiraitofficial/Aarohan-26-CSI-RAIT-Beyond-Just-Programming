@@ -3,8 +3,12 @@ Core configuration module for Swasthya Saathi backend.
 Loads environment variables and provides app-wide settings.
 """
 
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
+
+# Resolve the .env path relative to this file (backend/.env)
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -13,8 +17,15 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./swasthya_saathi.db"
 
+    # Firebase
+    FIREBASE_CREDENTIALS_PATH: str = ""
+    FIREBASE_PROJECT_ID: str = ""
+
     # Google Gemini
     GEMINI_API_KEY: str = "your_gemini_api_key_here"
+
+    # Daily.co Video
+    DAILY_API_KEY: str = ""
 
     # JWT
     SECRET_KEY: str = "dev-secret-key-change-in-production"
@@ -27,7 +38,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     model_config = {
-        "env_file": ".env",
+        "env_file": str(_ENV_FILE),
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
     }

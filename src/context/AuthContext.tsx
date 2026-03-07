@@ -1,50 +1,77 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserRole } from '../models';
+import { fetchProfile } from '../services/api';
+
+const AUTH_STORAGE_KEY = '@swasthya_auth';
 
 type AuthState = {
   token: string | null;
   userId: string | null;
   role: UserRole | null;
+  fullName: string | null;
+  phone: string | null;
   loading: boolean;
 };
 
 type AuthContextValue = AuthState & {
-  login: (role: UserRole, token: string, userId: string) => Promise<void>;
-  logout: () => Promise<void>;
+  login: (role: UserRole, token: string, userId: string, fullName?: string, phone?: string) => void;
+  logout: () => void;
 };
-
-const TOKEN_KEY = 'auth_token';
-const ROLE_KEY = 'auth_role';
-const USER_ID_KEY = 'auth_user_id';
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const [state, setState] = useState<AuthState>({ token: null, userId: null, role: null, loading: true });
+  const [state, setState] = useState<AuthState>({
+    token: null,
+    userId: null,
+    role: null,
+    fullName: null,
+    phone: null,
+    loading: true,
+  });
 
+  // Restore session from AsyncStorage on mount, validate token
   useEffect(() => {
-    const hydrate = async () => {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const role = (await SecureStore.getItemAsync(ROLE_KEY)) as UserRole | null;
-      const userId = await SecureStore.getItemAsync(USER_ID_KEY);
-      setState({ token, userId, role, loading: false });
-    };
-    hydrate();
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved.token) {
+            // Validate token by calling the backend
+            try {
+              const user = await fetchProfile(saved.token);
+              setState({
+                token: saved.token,
+                userId: user.id ?? saved.userId ?? null,
+                role: (user.role as UserRole) ?? saved.role ?? null,
+                fullName: user.full_name ?? saved.fullName ?? null,
+                phone: user.phone ?? saved.phone ?? null,
+                loading: false,
+              });
+              return;
+            } catch {
+              // Token is invalid/expired — clear stored session
+              await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+            }
+          }
+        }
+      } catch {}
+      setState((s) => ({ ...s, loading: false }));
+    })();
   }, []);
 
-  const login = useCallback(async (role: UserRole, token: string, userId: string) => {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-    await SecureStore.setItemAsync(ROLE_KEY, role);
-    await SecureStore.setItemAsync(USER_ID_KEY, userId);
-    setState({ token, userId, role, loading: false });
+  const login = useCallback((role: UserRole, token: string, userId: string, fullName?: string, phone?: string) => {
+    const next: AuthState = { token, userId, role, fullName: fullName ?? null, phone: phone ?? null, loading: false };
+    setState(next);
+    AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
 
-  const logout = useCallback(async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await SecureStore.deleteItemAsync(ROLE_KEY);
-    await SecureStore.deleteItemAsync(USER_ID_KEY);
-    setState({ token: null, userId: null, role: null, loading: false });
+  const logout = useCallback(() => {
+    const next: AuthState = { token: null, userId: null, role: null, fullName: null, phone: null, loading: false };
+    setState(next);
+    AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => {});
   }, []);
 
   const value = useMemo(() => ({ ...state, login, logout }), [state, login, logout]);
@@ -54,8 +81,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 };

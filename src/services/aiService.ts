@@ -143,14 +143,14 @@ export async function classifySymptoms(entry: SymptomEntry): Promise<AIClassific
     mild: 'Your symptoms appear to be mild. Rest, stay hydrated, and monitor your condition. Follow the self-care tips below.',
     moderate: 'Your symptoms require professional medical attention. We recommend consulting a doctor within the next few hours.',
     emergency: 'Critical symptoms detected. Immediate medical attention is required. Do not delay seeking help.',
-    pending: 'Assessment in progress. Please wait.',
+    pending: 'Assessment in progress. Please provide more information.',
   };
 
   const actionMap: Record<RiskLevel, string> = {
     mild: 'Follow self-care guidance and set a reminder to re-check in 24 hours.',
     moderate: 'Connect with an available doctor for consultation.',
     emergency: 'Call emergency services (112) immediately.',
-    pending: 'Awaiting assessment result.',
+    pending: 'Complete the symptom assessment to receive guidance.',
   };
 
   /* simulate network delay */

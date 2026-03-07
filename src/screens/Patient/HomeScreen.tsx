@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PatientStackParamList } from '../../navigation/types';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { RiskBadge } from '../../components/ui/RiskBadge';
@@ -18,10 +19,10 @@ const riskColors: Record<string, { bg: string; text: string; border: string }> =
   emergency: { bg: '#FEF2F2', text: '#DC2626', border: '#FCA5A5' },
 };
 
-const reminderIcons: Record<string, string> = {
-  medication: '💊',
-  'follow-up': '🩺',
-  'ai-check': '🤖',
+const reminderIconMap: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  medication: 'pill',
+  'follow-up': 'stethoscope',
+  'ai-check': 'robot-outline',
 };
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
@@ -44,6 +45,22 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const riskStyle = riskColors[lastRisk] ?? riskColors.mild;
 
+  /* ── Staggered fade-in animation ── */
+  const fadeAnims = useRef([...Array(5)].map(() => new Animated.Value(0))).current;
+  const slideAnims = useRef([...Array(5)].map(() => new Animated.Value(18))).current;
+
+  useEffect(() => {
+    const animations = fadeAnims.map((anim, i) =>
+      Animated.parallel([
+        Animated.timing(anim, { toValue: 1, duration: 400, delay: i * 80, useNativeDriver: true }),
+        Animated.timing(slideAnims[i], { toValue: 0, duration: 400, delay: i * 80, useNativeDriver: true }),
+      ])
+    );
+    Animated.stagger(0, animations).start();
+  }, []);
+
+  const animStyle = (i: number) => ({ opacity: fadeAnims[i], transform: [{ translateY: slideAnims[i] }] });
+
   return (
     <ScrollView
       style={styles.container}
@@ -57,7 +74,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.appName}>Swasthya Saathi</Text>
-          <Text style={styles.greeting}>Hello, {profile.name.split(' ')[0]} 👋</Text>
+          <Text style={styles.greeting}>Hello, {(profile.name || 'User').split(' ')[0]}</Text>
         </View>
         <View style={styles.headerRight}>
           <Pressable
@@ -65,7 +82,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => setNotifVisible(!notifVisible)}
             accessibilityLabel="Notifications"
           >
-            <Text style={styles.iconBtnText}>🔔</Text>
+            <MaterialCommunityIcons name="bell-outline" size={20} color={theme.colors.primary} />
             {activeEmergency && <View style={styles.notifDot} />}
           </Pressable>
           <Pressable
@@ -73,7 +90,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => navigation.navigate('ProfileScreen')}
             accessibilityLabel="Profile"
           >
-            <Text style={styles.avatarEmoji}>👩🏽</Text>
+            <MaterialCommunityIcons name="account-outline" size={24} color={theme.colors.primary} />
           </Pressable>
         </View>
       </View>
@@ -88,10 +105,10 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 navigation.navigate('EmergencyDashboard', { classificationId: activeEmergency.id });
               }}
             >
-              <Text style={styles.notifItem}>🚨 Emergency case active — Tap to view</Text>
+              <Text style={styles.notifItem}><MaterialCommunityIcons name="alert-circle" size={14} color="#DC2626" /> Emergency case active — Tap to view</Text>
             </Pressable>
           ) : (
-            <Text style={styles.notifItem}>✅ No urgent notifications</Text>
+            <Text style={styles.notifItem}><MaterialCommunityIcons name="check-circle-outline" size={14} color="#059669" /> No urgent notifications</Text>
           )}
         </View>
       )}
@@ -99,6 +116,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       {/* ═══════════════════════════════════════
           HEALTH STATUS CARD
       ═══════════════════════════════════════ */}
+      <Animated.View style={animStyle(0)}>
       <View style={[styles.healthCard, { backgroundColor: riskStyle.bg, borderColor: riskStyle.border }]}>
         <View style={styles.healthCardTop}>
           <View>
@@ -114,13 +132,17 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
         </View>
       </View>
+      </Animated.View>
 
       {/* ═══════════════════════════════════════
           PRIMARY ACTION — START HEALTH CHECK
       ═══════════════════════════════════════ */}
+      <Animated.View style={animStyle(1)}>
       <View style={styles.primaryCard}>
         <View style={styles.primaryCardInner}>
-          <Text style={styles.primaryCardEmoji}>🤖</Text>
+          <View style={styles.primaryCardIconWrap}>
+            <MaterialCommunityIcons name="robot-outline" size={28} color={theme.colors.primary} />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.primaryCardTitle}>Start Health Check</Text>
             <Text style={styles.primaryCardDesc}>Analyze your symptoms and vitals.</Text>
@@ -131,10 +153,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onPress={() => navigation.navigate('SymptomAgentScreen')}
         />
       </View>
+      </Animated.View>
 
       {/* ═══════════════════════════════════════
           QUICK ACTIONS — 2 × 2 GRID
       ═══════════════════════════════════════ */}
+      <Animated.View style={animStyle(2)}>
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       <View style={styles.gridRow}>
         {/* AI Health Check */}
@@ -143,7 +167,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onPress={() => navigation.navigate('SymptomAgentScreen')}
           accessibilityLabel="AI Health Check"
         >
-          <Text style={styles.gridIcon}>🤖</Text>
+          <MaterialCommunityIcons name="robot-outline" size={28} color="#0A84FF" />
           <Text style={styles.gridLabel}>AI Health{'\n'}Check</Text>
         </Pressable>
 
@@ -153,7 +177,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onPress={() => navigation.navigate('RecordsScreen')}
           accessibilityLabel="My Health Records"
         >
-          <Text style={styles.gridIcon}>📁</Text>
+          <MaterialCommunityIcons name="folder-outline" size={28} color="#059669" />
           <Text style={styles.gridLabel}>My Health{'\n'}Records</Text>
         </Pressable>
       </View>
@@ -164,7 +188,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onPress={() => navigation.navigate('RemindersScreen')}
           accessibilityLabel="Reminders"
         >
-          <Text style={styles.gridIcon}>🔔</Text>
+          <MaterialCommunityIcons name="bell-outline" size={28} color="#D97706" />
           <Text style={styles.gridLabel}>Reminders</Text>
         </Pressable>
 
@@ -174,10 +198,11 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onPress={() => setEmergencyVisible(true)}
           accessibilityLabel="Emergency Help"
         >
-          <Text style={styles.gridIcon}>🚨</Text>
+          <MaterialCommunityIcons name="alert-circle-outline" size={28} color="#DC2626" />
           <Text style={styles.gridLabel}>Emergency{'\n'}Help</Text>
         </Pressable>
       </View>
+      </Animated.View>
 
       {/* ── Nearby Hospitals ── */}
       <Pressable
@@ -198,6 +223,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       {/* ═══════════════════════════════════════
           UPCOMING REMINDERS
       ═══════════════════════════════════════ */}
+      <Animated.View style={animStyle(3)}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Upcoming Reminders</Text>
         <Pressable onPress={() => navigation.navigate('RemindersScreen')}>
@@ -217,7 +243,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => navigation.navigate('RemindersScreen')}
           >
             <View style={styles.reminderIconWrap}>
-              <Text style={styles.reminderIcon}>{reminderIcons[r.type] ?? '📅'}</Text>
+              <MaterialCommunityIcons name={reminderIconMap[r.type] ?? 'calendar-outline'} size={20} color={theme.colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.reminderTitle}>{r.title}</Text>
@@ -227,24 +253,29 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </Pressable>
         ))
       )}
+      </Animated.View>
 
       {/* ═══════════════════════════════════════
           HEALTH TIP
       ═══════════════════════════════════════ */}
+      <Animated.View style={animStyle(4)}>
       <View style={styles.tipCard}>
         <View style={styles.tipHeader}>
-          <Text style={styles.tipIcon}>💡</Text>
+          <MaterialCommunityIcons name="lightbulb-outline" size={20} color="#0369A1" />
           <Text style={styles.tipTitle}>Health Tip</Text>
         </View>
         <Text style={styles.tipText}>{tip}</Text>
       </View>
+      </Animated.View>
 
       {/* ═══════════════════════════════════════
           EMERGENCY ACCESS
       ═══════════════════════════════════════ */}
       <View style={styles.emergencyCard}>
         <View style={styles.emergencyCardTop}>
-          <Text style={styles.emergencyCardEmoji}>🚨</Text>
+          <View style={styles.emergencyIconWrap}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={28} color="#991B1B" />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.emergencyCardTitle}>Emergency Help</Text>
             <Text style={styles.emergencyCardDesc}>Request immediate medical assistance.</Text>
@@ -344,7 +375,7 @@ const styles = StyleSheet.create({
     ...CARD_SHADOW,
   },
   primaryCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  primaryCardEmoji: { fontSize: 36 },
+  primaryCardIconWrap: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#EBF3FF', alignItems: 'center', justifyContent: 'center' },
   primaryCardTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.textPrimary },
   primaryCardDesc: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 3 },
 
@@ -427,7 +458,7 @@ const styles = StyleSheet.create({
     ...CARD_SHADOW,
   },
   emergencyCardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  emergencyCardEmoji: { fontSize: 32 },
+  emergencyIconWrap: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
   emergencyCardTitle: { fontSize: 17, fontWeight: '800', color: '#991B1B' },
   emergencyCardDesc: { fontSize: 13, color: '#B91C1C', marginTop: 3 },
   emergencyBtn: {

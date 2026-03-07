@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.security import setup_security
 from app.db.database import engine, Base
-from app.api import auth, symptom_collection, triage, health, symptom_agent
+from app.api import auth, symptom_collection, triage, health, symptom_agent, video
 
 
 def create_app() -> FastAPI:
@@ -56,6 +56,11 @@ def create_app() -> FastAPI:
         symptom_agent.router,
         prefix="/api/symptom-agent",
         tags=["AI Symptom Agent"],
+    )
+    app.include_router(
+        video.router,
+        prefix="/api/video",
+        tags=["Video Call"],
     )
 
     return app

@@ -30,6 +30,8 @@ export type PatientStackParamList = {
   RemindersScreen: undefined;
   ProfileScreen: undefined;
   EmergencyScreen: undefined;
+  /* Video Call */
+  VideoCallScreen: { roomUrl: string; patientName?: string; consultationId?: string };
 };
 
 /* Bottom-tab param list */
@@ -39,4 +41,24 @@ export type PatientTabParamList = {
   RecordsTab: undefined;
   RemindersTab: undefined;
   ProfileTab: undefined;
+};
+
+/* Doctor tab param list */
+export type DoctorTabParamList = {
+  QueueTab: undefined;
+  HealthTab: undefined;
+  ConsultTab: undefined;
+  PrescriptionTab: undefined;
+  NotificationsTab: undefined;
+};
+
+/* Doctor stack param list */
+export type DoctorStackParamList = {
+  PatientQueueScreen: undefined;
+  PatientHealthDetailsScreen: { patientId?: string };
+  LiveConsultationScreen: { patientId?: string };
+  EPrescriptionScreen: { patientId?: string };
+  DoctorNotificationsScreen: undefined;
+  /* Video Call */
+  VideoCallScreen: { roomUrl: string; patientName?: string; consultationId?: string };
 };

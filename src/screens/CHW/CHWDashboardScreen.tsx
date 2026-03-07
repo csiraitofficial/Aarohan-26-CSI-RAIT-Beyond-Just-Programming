@@ -747,4 +747,3 @@ const m = StyleSheet.create({
   phoneLabel:{ fontSize: 11, fontWeight: '700', color: G.sub, textTransform: 'uppercase', letterSpacing: 0.5 },
   phone:     { fontSize: 26, fontWeight: '900', color: G.dark, marginTop: 4, letterSpacing: 2 },
 });
-

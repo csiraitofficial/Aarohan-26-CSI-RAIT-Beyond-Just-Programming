@@ -10,6 +10,22 @@
     ],
     "plugins": [
       "expo-secure-store"
-    ]
+    ],
+    "android": {
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs camera access for video consultations with doctors.",
+        "NSMicrophoneUsageDescription": "This app needs microphone access for video consultations with doctors."
+      }
+    },
+    "extra": {
+      "BACKEND_URL": "http://192.168.137.192:8000"
+    }
   }
 }
